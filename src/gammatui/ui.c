@@ -1,6 +1,8 @@
 #define _POSIX_C_SOURCE 200809L
-#include "gammatui.h"
+#include <stdio.h>
 #include <string.h>
+#include <ncurses.h>
+#include "gammatui.h"
 
 enum {
     COLOR_PAIR_DEFAULT = 1,
@@ -72,10 +74,9 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
     mvwprintw(win, 2, (cols - (int)strlen(output_buf)) / 2, "%s", output_buf);
     wattroff(win, COLOR_PAIR(COLOR_PAIR_HEADER));
     
-    mvwaddch(win, 3, 1, ACS_LTEE);
-    mvwhline(win, 3, 2, ACS_HLINE, cols - 4);
-    mvwaddch(win, 3, cols - 2, ACS_RTEE);
-
+    mvwaddch(win, 3, 0, ACS_LTEE);
+    mvwhline(win, 3, 1, ACS_HLINE, cols - 2);
+    mvwaddch(win, 3, cols - 1, ACS_RTEE);
 
     int left_margin = 4;
     int bar_width = cols - (left_margin * 2);
@@ -107,10 +108,9 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
 
     draw_bar(win, bright_y + 1, left_margin, bar_width, bright, 0.1, 2.0);
 
-
-    mvwaddch(win, rows - 3, 1, ACS_LTEE);
-    mvwhline(win, rows - 3, 2, ACS_HLINE, cols - 4);
-    mvwaddch(win, rows - 3, cols - 2, ACS_RTEE);
+    mvwaddch(win, rows - 3, 0, ACS_LTEE);
+    mvwhline(win, rows - 3, 1, ACS_HLINE, cols - 2);
+    mvwaddch(win, rows - 3, cols - 1, ACS_RTEE);
     
     const char *help_text = "[Up/Down] Select   [Left/Right] Adjust   [R] Reset   [Q] Quit";
     int help_x = (cols - (int)strlen(help_text)) / 2;
