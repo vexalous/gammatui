@@ -10,12 +10,15 @@
 #include <unistd.h>
 #include <limits.h>
 
+extern volatile sig_atomic_t active_child;
+extern void shutdown_handler(int sig);
+
 int main(int argc, char **argv) {
-    struct sigaction sa = {0};
-    sa.sa_handler = sigwinch_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    sigaction(SIGWINCH, &sa, NULL);
+    initscr();
+    cbreak();
+    noecho();
+    keypad(stdscr, TRUE);
+    curs_set(0);
 
     struct sigaction sh = {0};
     sh.sa_handler = shutdown_handler;
@@ -24,17 +27,15 @@ int main(int argc, char **argv) {
     sigaction(SIGINT, &sh, NULL);
     sigaction(SIGTERM, &sh, NULL);
 
-    int rows = 24, cols = 80;
-    initscr();
-    cbreak();
-    noecho();
-    keypad(stdscr, TRUE);
-    curs_set(0);
+    int rows, cols;
     getmaxyx(stdscr, rows, cols);
 
-    WINDOW *win = newwin(rows - 2, cols - 2, 1, 1);
-    keypad(win, TRUE);
-    wtimeout(win, -1);
+    WINDOW *win = recreate_window(&rows, &cols);
+    if (!win) {
+        win = newwin(rows - 2, cols - 2, 1, 1);
+        keypad(win, TRUE);
+        wtimeout(win, -1);
+    }
 
     int highlight = 0;
 
@@ -48,53 +49,53 @@ int main(int argc, char **argv) {
 
     draw_menu(win, highlight);
 
-    for (;;) {
-        if (resized) {
-            resized = 0;
+    bool running = true;
+    while (running) {
+        int ch = wgetch(win);
+
+        if (ch == KEY_RESIZE) {
             endwin();
             refresh();
-            clear();
-            if (win) {
-                delwin(win);
-                win = NULL;
-            }
+            getmaxyx(stdscr, rows, cols);
+            
+            if (win) delwin(win);
             win = recreate_window(&rows, &cols);
             draw_menu(win, highlight);
+            continue;
         }
 
-        int ch = wgetch(win);
-        if (ch == KEY_RESIZE) {
-            if (win) {
-                delwin(win);
-                win = NULL;
-            }
-            win = recreate_window(&rows, &cols);
-            draw_menu(win, highlight);
-            continue;
-        }
-        if (ch == ERR)
-            continue;
+        if (ch == ERR) continue;
 
         if (ch == KEY_UP)
             highlight = (highlight + 3 - 1) % 3;
         else if (ch == KEY_DOWN)
             highlight = (highlight + 1) % 3;
+        else if (ch == 'q' || ch == 'Q')
+            running = false;
         else if (ch == '\n' || ch == KEY_ENTER) {
             if (highlight == MI_Adjustment) {
+                if (!gammatui_ok) gammatui_ok = is_executable_file(gammatui_path);
+
                 if (!gammatui_ok) {
                     show_message(win, "Not found",
                                  "Expected ../gammatui/gammatui.elf relative to menu.elf\nPlace gammatui.elf at ../gammatui/gammatui.elf and make it executable.");
                 } else {
                     flushinp();
+                    
+                    def_prog_mode();
                     endwin();
+                    
                     int rc = spawn_and_wait(gammatui_path);
+                    
                     struct timespec ts = {0, 100000000L};
                     nanosleep(&ts, NULL);
-                    if (win) {
-                        delwin(win);
-                        win = NULL;
-                    }
+                    
+                    reset_prog_mode();
+                    refresh();
+                    
+                    if (win) delwin(win);
                     win = recreate_window(&rows, &cols);
+                    
                     if (rc == 0)
                         gammatui_ok = is_executable_file(gammatui_path);
                     else if (rc == -1)
@@ -112,20 +113,28 @@ int main(int argc, char **argv) {
                     }
                 }
             } else if (highlight == MI_Settings) {
+                // Re-check file existence
+                if (!settings_ok) settings_ok = is_executable_file(settings_path);
+
                 if (!settings_ok) {
                     show_message(win, "Not found",
                                  "Expected ../settings/brightnesstui.elf relative to menu.elf\nPlace brightnesstui.elf at ../settings/brightnesstui.elf and make it executable.");
                 } else {
                     flushinp();
+                    def_prog_mode();
                     endwin();
+                    
                     int rc = spawn_and_wait(settings_path);
+                    
                     struct timespec ts = {0, 100000000L};
                     nanosleep(&ts, NULL);
-                    if (win) {
-                        delwin(win);
-                        win = NULL;
-                    }
+                    
+                    reset_prog_mode();
+                    refresh();
+
+                    if (win) delwin(win);
                     win = recreate_window(&rows, &cols);
+                    
                     if (rc == 0)
                         settings_ok = is_executable_file(settings_path);
                     else if (rc == -1)
@@ -142,20 +151,16 @@ int main(int argc, char **argv) {
                         show_message(win, "Exited", buf);
                     }
                 }
-            } else if (highlight == MI_Quit)
-                break;
-        } else if (ch == 'q' || ch == 'Q')
-            break;
+            } else if (highlight == MI_Quit) {
+                running = false;
+            }
+        }
 
-        getmaxyx(stdscr, rows, cols);
-        if (win)
-            wresize(win, rows - 2, cols - 2);
-        draw_menu(win, highlight);
+        if (running) draw_menu(win, highlight);
     }
 
-    pid_t c = active_child;
-    if (c > 0)
-        terminate_child_group(c);
+    if (active_child > 0)
+        terminate_child_group(active_child);
     if (win)
         delwin(win);
     endwin();
