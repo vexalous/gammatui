@@ -1,9 +1,9 @@
 CC = gcc
 CFLAGS = -std=c99 -pedantic-errors -Werror -Wall -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -Wunreachable-code -Iinclude -g
 LDFLAGS = -pthread
-LDLIBS_GAMMATUI = -lncurses -lX11 -lXrandr -lm
-LDLIBS_MENU = -lncurses
-LDLIBS_SETTINGS = -lncurses
+LDLIBS_GAMMATUI = -lncurses -ltinfo -lX11 -lXrandr -lm
+LDLIBS_MENU = -lncurses -ltinfo
+LDLIBS_SETTINGS = -lncurses -ltinfo
 
 BUILD_DIR = build
 MENU_DIR = $(BUILD_DIR)/menu
