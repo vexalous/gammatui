@@ -10,17 +10,12 @@ void apply_values(double gamma, double bright) {
         return;
     }
 
-    char buf[64];
-
-    if (gamma != cached_gamma) {
-        snprintf(buf, sizeof(buf), "%.3f:%.3f:%.3f", gamma, gamma, gamma);
-        xr_call_async(display_output, "--gamma", buf);
+    if (gamma != cached_gamma || bright != cached_bright) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.4f:%.4f", gamma, bright);
+        xr_call_async(display_output, "--set", buf);
+        
         cached_gamma = gamma;
-    }
-
-    if (bright != cached_bright) {
-        snprintf(buf, sizeof(buf), "%.3f", bright);
-        xr_call_async(display_output, "--brightness", buf);
         cached_bright = bright;
     }
 }
