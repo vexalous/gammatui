@@ -52,7 +52,9 @@ bool load_config(struct cfg *c, const char *path) {
     if (!c || !path) return false;
 
     c->output[0] = '\0';
-    c->gamma_max = 3.0;
+    c->gamma_min = 0.1;
+    c->gamma_max = 10.0;
+    c->bright_min = 0.1;
     c->bright_max = 2.0;
 
     FILE *f = fopen(path, "r");
@@ -78,18 +80,22 @@ bool load_config(struct cfg *c, const char *path) {
                     c->output[len] = '\0';
                 }
             }
-        } else if (strncmp(key, "\"gamma_max\"", 11) == 0) {
+        } 
+        else if (strncmp(key, "\"gamma_min\"", 11) == 0) {
             char *p = strchr(key, ':');
-            if (p) {
-                p++;
-                c->gamma_max = strtod(p, NULL);
-            }
-        } else if (strncmp(key, "\"brightness_max\"", 16) == 0 || strncmp(key, "\"bright_max\"", 12) == 0) {
+            if (p) c->gamma_min = strtod(p + 1, NULL);
+        }
+        else if (strncmp(key, "\"gamma_max\"", 11) == 0) {
             char *p = strchr(key, ':');
-            if (p) {
-                p++;
-                c->bright_max = strtod(p, NULL);
-            }
+            if (p) c->gamma_max = strtod(p + 1, NULL);
+        }
+        else if (strncmp(key, "\"brightness_min\"", 16) == 0 || strncmp(key, "\"bright_min\"", 12) == 0) {
+            char *p = strchr(key, ':');
+            if (p) c->bright_min = strtod(p + 1, NULL);
+        }
+        else if (strncmp(key, "\"brightness_max\"", 16) == 0 || strncmp(key, "\"bright_max\"", 12) == 0) {
+            char *p = strchr(key, ':');
+            if (p) c->bright_max = strtod(p + 1, NULL);
         }
     }
 
@@ -107,7 +113,9 @@ bool save_config(const struct cfg *c, const char *path) {
 
     fprintf(f, "{\n");
     fprintf(f, "  \"output\": \"%s\",\n", c->output[0] ? c->output : "");
+    fprintf(f, "  \"gamma_min\": %.3f,\n", c->gamma_min);
     fprintf(f, "  \"gamma_max\": %.3f,\n", c->gamma_max);
+    fprintf(f, "  \"brightness_min\": %.3f,\n", c->bright_min);
     fprintf(f, "  \"brightness_max\": %.3f\n", c->bright_max);
     fprintf(f, "}\n");
 
