@@ -46,7 +46,6 @@ $(TARGET_SETTINGS): $(SETTINGS_OBJS)
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_SETTINGS)
 	@echo "Linked ==> $@"
 
-# Generic rule to compile any source file in src/ to build/
 $(BUILD_DIR)/%.o: src/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
