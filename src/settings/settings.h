@@ -10,7 +10,9 @@
 
 struct cfg {
     char output[OUTPUT_LEN];
+    double gamma_min;
     double gamma_max;
+    double bright_min;
     double bright_max;
 };
 
