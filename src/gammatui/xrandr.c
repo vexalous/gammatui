@@ -86,39 +86,31 @@ static void *xr_worker(void *arg) {
     
     if (crtc_id != 0) {
         int size = XRRGetCrtcGammaSize(dpy, crtc_id);
-        if (size == 0) {
-             XCloseDisplay(dpy);
-             free(a);
-             return NULL;
-        }
-        XRRCrtcGamma *gamma = XRRAllocGamma(size);
-
-        if (strcmp(a->opt, "--gamma") == 0) {
-            float r, g, b;
-            sscanf(a->val, "%f:%f:%f", &r, &g, &b);
-            for (int i = 0; i < size; i++) {
-                double ramp = (double)i / (double)(size - 1);
-                gamma->red[i]   = (unsigned short)(pow(ramp, 1.0/r) * 65535.0 + 0.5);
-                gamma->green[i] = (unsigned short)(pow(ramp, 1.0/g) * 65535.0 + 0.5);
-                gamma->blue[i]  = (unsigned short)(pow(ramp, 1.0/b) * 65535.0 + 0.5);
-            }
-        } else if (strcmp(a->opt, "--brightness") == 0) {
-            float brightness = strtof(a->val, NULL);
-            XRRCrtcGamma *current_gamma = XRRGetCrtcGamma(dpy, crtc_id);
-            if (current_gamma) {
-                 for (int i = 0; i < size; i++) {
-                    gamma->red[i]   = (unsigned short)((double)current_gamma->red[i] * brightness);
-                    gamma->green[i] = (unsigned short)((double)current_gamma->green[i] * brightness);
-                    gamma->blue[i]  = (unsigned short)((double)current_gamma->blue[i] * brightness);
+        if (size > 0) {
+            XRRCrtcGamma *gamma = XRRAllocGamma(size);
+            if (gamma) {
+                if (strcmp(a->opt, "--set") == 0) {
+                    float g_val, b_val;
+                    if (sscanf(a->val, "%f:%f", &g_val, &b_val) == 2) {
+                        for (int i = 0; i < size; i++) {
+                            double ramp = (double)i / (double)(size - 1);
+                            double v = pow(ramp, 1.0 / g_val) * b_val;
+                            
+                            if (v > 1.0) v = 1.0;
+                            if (v < 0.0) v = 0.0;
+                            
+                            unsigned short s = (unsigned short)(v * 65535.0 + 0.5);
+                            gamma->red[i] = s;
+                            gamma->green[i] = s;
+                            gamma->blue[i] = s;
+                        }
+                        XRRSetCrtcGamma(dpy, crtc_id, gamma);
+                    }
                 }
-                XRRFreeGamma(current_gamma);
+                XRRFreeGamma(gamma);
             }
         }
-
-        XRRSetCrtcGamma(dpy, crtc_id, gamma);
-        XRRFreeGamma(gamma);
     }
-
 
     XCloseDisplay(dpy);
     free(a);
