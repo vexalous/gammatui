@@ -1,31 +1,30 @@
 #define _POSIX_C_SOURCE 200809L
 #include "gamma_control.h"
 #include <stdio.h>
-#include <string.h>
+
+static double cached_gamma = -1.0;
+static double cached_bright = -1.0;
 
 void apply_values(double gamma, double bright) {
     if (display_output[0] == '\0') {
         return;
     }
 
-    char value_str[32];
-    int len = snprintf(value_str, sizeof(value_str), "%.3f:%.3f:%.3f", gamma, gamma, gamma);
-    if (len > 0 && (size_t)len < sizeof(value_str)) {
-        xr_call_async(display_output, "--gamma", value_str);
+    char buf[64];
+
+    if (gamma != cached_gamma) {
+        snprintf(buf, sizeof(buf), "%.3f:%.3f:%.3f", gamma, gamma, gamma);
+        xr_call_async(display_output, "--gamma", buf);
+        cached_gamma = gamma;
     }
 
-    len = snprintf(value_str, sizeof(value_str), "%.3f", bright);
-    if (len > 0 && (size_t)len < sizeof(value_str)) {
-        xr_call_async(display_output, "--brightness", value_str);
+    if (bright != cached_bright) {
+        snprintf(buf, sizeof(buf), "%.3f", bright);
+        xr_call_async(display_output, "--brightness", buf);
+        cached_bright = bright;
     }
 }
 
-void revert_values() {
-    if (display_output[0] == '\0') {
-        return;
-    }
-    static const char* const DEFAULT_GAMMA = "1:1:1";
-    static const char* const DEFAULT_BRIGHTNESS = "1";
-    xr_call_async(display_output, "--gamma", DEFAULT_GAMMA);
-    xr_call_async(display_output, "--brightness", DEFAULT_BRIGHTNESS);
+void revert_values(void) {
+    apply_values(1.0, 1.0);
 }
