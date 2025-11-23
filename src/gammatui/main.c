@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200809L
+#define _XOPEN_SOURCE 700
 #include "gammatui.h"
 #include "gamma_control.h"
 #include <stdio.h>
@@ -6,18 +6,64 @@
 #include <string.h>
 #include <getopt.h>
 #include <ncurses.h>
+#include <limits.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <libgen.h>
 
-#define GAMMA_STEP 0.02
-#define BRIGHT_STEP 0.01
-#define GAMMA_MIN 0.5
-#define GAMMA_MAX 3.0
-#define BRIGHT_MIN 0.1
-#define BRIGHT_MAX 2.0
+static double config_gamma_min = 0.1;
+static double config_gamma_max = 10.0;
+static double config_bright_min = 0.1;
+static double config_bright_max = 2.0;
+
+static void load_config_limits(const char *argv0) {
+    char exe_path[PATH_MAX] = {0};
+    
+#if defined(__linux__)
+    ssize_t n = readlink("/proc/self/exe", exe_path, sizeof(exe_path)-1);
+    if (n > 0) exe_path[n] = '\0';
+#endif
+    if (exe_path[0] == '\0' && argv0) {
+        if (realpath(argv0, exe_path) == NULL) {
+            strncpy(exe_path, argv0, sizeof(exe_path)-1);
+        }
+    }
+    
+    char *dir = dirname(exe_path);
+    char config_path[PATH_MAX];
+    snprintf(config_path, sizeof(config_path), "%s/../settings/config.json", dir);
+
+    FILE *f = fopen(config_path, "r");
+    if (!f) return;
+
+    char line[256];
+    while (fgets(line, sizeof(line), f)) {
+        char *key = line;
+        while (isspace((unsigned char)*key)) key++;
+
+        if (strncmp(key, "\"gamma_min\"", 11) == 0) {
+            char *p = strchr(key, ':');
+            if (p) config_gamma_min = strtod(p + 1, NULL);
+        } else if (strncmp(key, "\"gamma_max\"", 11) == 0) {
+            char *p = strchr(key, ':');
+            if (p) config_gamma_max = strtod(p + 1, NULL);
+        } else if (strncmp(key, "\"brightness_min\"", 16) == 0 || strncmp(key, "\"bright_min\"", 12) == 0) {
+            char *p = strchr(key, ':');
+            if (p) config_bright_min = strtod(p + 1, NULL);
+        } else if (strncmp(key, "\"brightness_max\"", 16) == 0 || strncmp(key, "\"bright_max\"", 12) == 0) {
+            char *p = strchr(key, ':');
+            if (p) config_bright_max = strtod(p + 1, NULL);
+        }
+    }
+    fclose(f);
+}
 
 static void handle_resize(WINDOW **win, int *rows, int *cols) {
     int new_rows, new_cols;
     getmaxyx(stdscr, new_rows, new_cols);
     
+    if (new_rows < 5 || new_cols < 10) return;
+
     if (new_rows != *rows || new_cols != *cols) {
         *rows = new_rows;
         *cols = new_cols;
@@ -28,15 +74,9 @@ static void handle_resize(WINDOW **win, int *rows, int *cols) {
     }
 }
 
-static void update_settings(int selected, double *gamma, double *bright, int direction) {
-    if (selected == 0) {
-        *gamma = clamp_double(*gamma + (direction * GAMMA_STEP), GAMMA_MIN, GAMMA_MAX);
-    } else {
-        *bright = clamp_double(*bright + (direction * BRIGHT_STEP), BRIGHT_MIN, BRIGHT_MAX);
-    }
-}
-
 int main(int argc, char **argv) {
+    load_config_limits(argc > 0 ? argv[0] : NULL);
+
     int opt;
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -70,8 +110,8 @@ int main(int argc, char **argv) {
         display_output[0] = '\0';
     }
 
-    double gamma = 1.0;
-    double bright = 1.0;
+    double gamma = clamp_double(1.0, config_gamma_min, config_gamma_max);
+    double bright = clamp_double(1.0, config_bright_min, config_bright_max);
     int selected = 0; 
     int rows, cols;
 
@@ -83,6 +123,12 @@ int main(int argc, char **argv) {
     if (has_colors()) init_colors_safe();
 
     getmaxyx(stdscr, rows, cols);
+    if (rows < 5 || cols < 10) {
+        endwin();
+        fprintf(stderr, "Terminal too small.\n");
+        return 1;
+    }
+
     WINDOW *win = newwin(rows - 2, cols - 2, 1, 1);
     nodelay(stdscr, FALSE);
 
@@ -91,7 +137,7 @@ int main(int argc, char **argv) {
     int ch;
     bool running = true;
 
-    while (running && (ch = getch())) {
+    while (running && (ch = getch()) != ERR) {
         bool needs_redraw = false;
         bool needs_apply = false;
 
@@ -107,23 +153,45 @@ int main(int argc, char **argv) {
                 needs_redraw = true;
                 break;
 
-            case KEY_LEFT:
-                update_settings(selected, &gamma, &bright, -1);
-                needs_apply = true;
-                needs_redraw = true;
-                break;
+            case '/': {
+                char buf[32] = {0};
+                int h = getmaxy(win);
 
-            case KEY_RIGHT:
-                update_settings(selected, &gamma, &bright, 1);
-                needs_apply = true;
+                curs_set(1);
+                echo();
+                
+                mvwprintw(win, h - 2, 2, "Set Value: ");
+                wrefresh(win);
+                
+                wgetnstr(win, buf, sizeof(buf) - 1);
+                
+                noecho();
+                curs_set(0);
+                
+                char *endptr;
+                double val = strtod(buf, &endptr);
+                if (endptr != buf) {
+                    if (selected == 0) {
+                        if (val >= config_gamma_min && val <= config_gamma_max) {
+                            gamma = val;
+                            needs_apply = true;
+                        }
+                    } else {
+                        if (val >= config_bright_min && val <= config_bright_max) {
+                            bright = val;
+                            needs_apply = true;
+                        }
+                    }
+                }
                 needs_redraw = true;
                 break;
+            }
 
             case 'r':
             case 'R':
-                revert_values();
-                gamma = 1.0;
-                bright = 1.0;
+                gamma = clamp_double(1.0, config_gamma_min, config_gamma_max);
+                bright = clamp_double(1.0, config_bright_min, config_bright_max);
+                apply_values(gamma, bright);
                 needs_redraw = true;
                 break;
 
