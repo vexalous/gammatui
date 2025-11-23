@@ -24,34 +24,12 @@ void init_colors_safe(void) {
     init_pair(COLOR_PAIR_DEFAULT,      COLOR_WHITE,   -1);
     init_pair(COLOR_PAIR_TITLE,        COLOR_CYAN,    -1);
     init_pair(COLOR_PAIR_HEADER,       COLOR_YELLOW,  -1);
-    init_pair(COLOR_PAIR_LABEL,        COLOR_WHITE,   -1);
-    init_pair(COLOR_PAIR_VALUE,        COLOR_CYAN,    -1);
-    init_pair(COLOR_PAIR_VALUE_SELECTED, COLOR_MAGENTA, -1);
+    init_pair(COLOR_PAIR_LABEL,        COLOR_MAGENTA, -1);
+    init_pair(COLOR_PAIR_VALUE,        COLOR_MAGENTA, -1);
+    init_pair(COLOR_PAIR_VALUE_SELECTED, COLOR_WHITE, -1);
     init_pair(COLOR_PAIR_BAR_FILL,     COLOR_GREEN,   -1);
     init_pair(COLOR_PAIR_BAR_EMPTY,    COLOR_WHITE,   -1);
     init_pair(COLOR_PAIR_HELP,         COLOR_BLUE,    -1);
-}
-
-void draw_bar(WINDOW *w, int y, int x, int width, double value, double lo, double hi) {
-    int inner_width = width - 2;
-    mvwaddch(w, y, x, '[');
-    mvwaddch(w, y, x + width - 1, ']');
-
-    double frac = (value - lo) / (hi - lo);
-    frac = (frac < 0) ? 0 : (frac > 1) ? 1 : frac;
-    int fill_width = (int)(frac * (double)inner_width);
-
-    wattron(w, COLOR_PAIR(COLOR_PAIR_BAR_FILL));
-    for (int i = 0; i < fill_width; ++i) {
-        mvwaddch(w, y, x + 1 + i, '#');
-    }
-    wattroff(w, COLOR_PAIR(COLOR_PAIR_BAR_FILL));
-
-    wattron(w, COLOR_PAIR(COLOR_PAIR_BAR_EMPTY));
-    for (int i = fill_width; i < inner_width; ++i) {
-        mvwaddch(w, y, x + 1 + i, '-');
-    }
-    wattroff(w, COLOR_PAIR(COLOR_PAIR_BAR_EMPTY));
 }
 
 void draw_rounded_border(WINDOW *w) {
@@ -79,10 +57,10 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
     mvwaddch(win, 3, cols - 1, ACS_RTEE);
 
     int left_margin = 4;
-    int bar_width = cols - (left_margin * 2);
     int control_y_start = 5;
 
     int gamma_y = control_y_start;
+    
     wattron(win, COLOR_PAIR(selected == 0 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_LABEL) | A_BOLD);
     mvwprintw(win, gamma_y, left_margin, "Gamma");
     wattroff(win, COLOR_PAIR(selected == 0 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_LABEL) | A_BOLD);
@@ -93,9 +71,8 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
     mvwprintw(win, gamma_y, cols - left_margin - (int)strlen(gamma_val_str), "%s", gamma_val_str);
     wattroff(win, COLOR_PAIR(selected == 0 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_VALUE) | A_BOLD);
     
-    draw_bar(win, gamma_y + 1, left_margin, bar_width, gamma, 0.5, 3.0);
-
-    int bright_y = gamma_y + 3;
+    int bright_y = gamma_y + 2;
+    
     wattron(win, COLOR_PAIR(selected == 1 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_LABEL) | A_BOLD);
     mvwprintw(win, bright_y, left_margin, "Brightness");
     wattroff(win, COLOR_PAIR(selected == 1 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_LABEL) | A_BOLD);
@@ -106,13 +83,11 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
     mvwprintw(win, bright_y, cols - left_margin - (int)strlen(bright_val_str), "%s", bright_val_str);
     wattroff(win, COLOR_PAIR(selected == 1 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_VALUE) | A_BOLD);
 
-    draw_bar(win, bright_y + 1, left_margin, bar_width, bright, 0.1, 2.0);
-
     mvwaddch(win, rows - 3, 0, ACS_LTEE);
     mvwhline(win, rows - 3, 1, ACS_HLINE, cols - 2);
     mvwaddch(win, rows - 3, cols - 1, ACS_RTEE);
     
-    const char *help_text = "[Up/Down] Select   [Left/Right] Adjust   [R] Reset   [Q] Quit";
+    const char *help_text = "[Up/Down] Select   [/] Set Value   [R] Reset   [Q] Quit";
     int help_x = (cols - (int)strlen(help_text)) / 2;
     wattron(win, COLOR_PAIR(COLOR_PAIR_HELP));
     mvwprintw(win, rows - 2, help_x, "%s", help_text);
