@@ -113,7 +113,6 @@ int main(int argc, char **argv) {
                     }
                 }
             } else if (highlight == MI_Settings) {
-                // Re-check file existence
                 if (!settings_ok) settings_ok = is_executable_file(settings_path);
 
                 if (!settings_ok) {
