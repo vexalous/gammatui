@@ -37,7 +37,8 @@ void draw_rounded_border(WINDOW *w) {
     wborder(w, ACS_VLINE, ACS_VLINE, ACS_HLINE, ACS_HLINE, ACS_ULCORNER, ACS_URCORNER, ACS_LLCORNER, ACS_LRCORNER);
 }
 
-void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, int cols) {
+void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, int cols,
+             int k_up, int k_down, int k_sel, int k_quit) {
     werase(win);
     draw_rounded_border(win);
 
@@ -84,8 +85,19 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
     mvwhline(win, rows - 3, 1, ACS_HLINE, cols - 2);
     mvwaddch(win, rows - 3, cols - 1, ACS_RTEE);
 
-    const char *help_text = "[w/s] Select [/] Set Value [R] Reset [Q] Quit";
+    const char *kn_up = keyname(k_up); if(!kn_up) kn_up="?";
+    const char *kn_dn = keyname(k_down); if(!kn_dn) kn_dn="?";
+    const char *kn_sl = keyname(k_sel); if(!kn_sl) kn_sl="?";
+    const char *kn_qt = keyname(k_quit); if(!kn_qt) kn_qt="?";
+
+    char help_text[256];
+    snprintf(help_text, sizeof(help_text), 
+             "[%s/%s] Select [%s] Set Value [R] Reset [%s] Quit", 
+             kn_up, kn_dn, kn_sl, kn_qt);
+
     int help_x = (cols - (int)strlen(help_text)) / 2;
+    if(help_x < 1) help_x = 1;
+
     wattron(win, COLOR_PAIR(COLOR_PAIR_HELP));
     mvwprintw(win, rows - 2, help_x, "%s", help_text);
     wattroff(win, COLOR_PAIR(COLOR_PAIR_HELP));
