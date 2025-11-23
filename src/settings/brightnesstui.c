@@ -11,15 +11,28 @@
 #include <ctype.h>
 #include <stddef.h>
 
-static const char *TITLE = "Gammatui - Brightness Settings";
-static const char *UI_FIELDS[] = { "Output", "Gamma max", "Brightness max" };
+static const char *TITLE = "Gammatui - Settings";
+static const char *UI_FIELDS[] = { 
+    "Output", 
+    "Gamma Min", 
+    "Gamma Max", 
+    "Bright Min", 
+    "Bright Max" 
+};
 
 #define UI_START_ROW 5
 #define UI_LABEL_COL 4
 #define UI_VALUE_COL 20
 #define UI_ROW_STEP  2
 
-enum { FI_OUTPUT = 0, FI_GAMMA_MAX = 1, FI_BRIGHT_MAX = 2, FI_COUNT = 3 };
+enum { 
+    FI_OUTPUT = 0, 
+    FI_GAMMA_MIN, 
+    FI_GAMMA_MAX, 
+    FI_BRIGHT_MIN, 
+    FI_BRIGHT_MAX, 
+    FI_COUNT 
+};
 
 static void show_message(WINDOW *w, const char *title, const char *msg) {
     werase(w);
@@ -34,7 +47,6 @@ static void show_message(WINDOW *w, const char *title, const char *msg) {
 static void string_insert_char(char *str, int pos, int max_len, char ch) {
     int len = (int)strlen(str);
     if (len >= max_len - 1) return;
-    
     for (int i = len; i > pos; i--) {
         str[i] = str[i-1];
     }
@@ -45,7 +57,6 @@ static void string_insert_char(char *str, int pos, int max_len, char ch) {
 static void string_delete_char(char *str, int pos) {
     int len = (int)strlen(str);
     if (pos >= len) return;
-    
     for (int i = pos; i < len; i++) {
         str[i] = str[i+1];
     }
@@ -118,23 +129,16 @@ static void edit_string(WINDOW *w, int row, int col, char *buf, size_t bufsz) {
                 break;
         }
     }
-
     curs_set(0);
 }
 
 static void edit_double(WINDOW *w, int row, int col, double *val) {
     char tmp[64];
     snprintf(tmp, sizeof(tmp), "%.3f", *val);
-    
-    char orig[64];
-    strncpy(orig, tmp, sizeof(orig));
-    
     edit_string(w, row, col, tmp, sizeof(tmp));
     
-    double v;
     char *endptr;
-    v = strtod(tmp, &endptr);
-    
+    double v = strtod(tmp, &endptr);
     if (endptr != tmp && *endptr == '\0') {
         *val = v;
     }
@@ -157,8 +161,12 @@ static void draw_form(WINDOW *w, const struct cfg *c, int highlight) {
         if (i == FI_OUTPUT) {
             mvwprintw(w, current_row, UI_VALUE_COL, "%s", 
                       c->output[0] ? c->output : "(empty)");
+        } else if (i == FI_GAMMA_MIN) {
+            mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->gamma_min);
         } else if (i == FI_GAMMA_MAX) {
             mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->gamma_max);
+        } else if (i == FI_BRIGHT_MIN) {
+            mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->bright_min);
         } else if (i == FI_BRIGHT_MAX) {
             mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->bright_max);
         }
@@ -179,7 +187,9 @@ int main(int argc, char **argv) {
     if (!load_config(&cur, cfgpath)) {
         memset(&cur, 0, sizeof(cur));
         strncpy(cur.output, "eDP-1", OUTPUT_LEN - 1);
-        cur.gamma_max = 3.0;
+        cur.gamma_min = 0.1;
+        cur.gamma_max = 10.0;
+        cur.bright_min = 0.1;
         cur.bright_max = 2.0;
     }
 
@@ -209,24 +219,22 @@ int main(int argc, char **argv) {
         
         switch (ch) {
             case KEY_UP:
-                if (highlight > 0) {
-                    highlight--;
-                    dirty = true;
-                }
+                if (highlight > 0) { highlight--; dirty = true; }
                 break;
             case KEY_DOWN:
-                if (highlight < FI_COUNT - 1) {
-                    highlight++;
-                    dirty = true;
-                }
+                if (highlight < FI_COUNT - 1) { highlight++; dirty = true; }
                 break;
             case '\n':
             case KEY_ENTER: {
                 int row = UI_START_ROW + highlight * UI_ROW_STEP;
                 if (highlight == FI_OUTPUT) {
                     edit_string(win, row, UI_VALUE_COL, cur.output, sizeof(cur.output));
+                } else if (highlight == FI_GAMMA_MIN) {
+                    edit_double(win, row, UI_VALUE_COL, &cur.gamma_min);
                 } else if (highlight == FI_GAMMA_MAX) {
                     edit_double(win, row, UI_VALUE_COL, &cur.gamma_max);
+                } else if (highlight == FI_BRIGHT_MIN) {
+                    edit_double(win, row, UI_VALUE_COL, &cur.bright_min);
                 } else if (highlight == FI_BRIGHT_MAX) {
                     edit_double(win, row, UI_VALUE_COL, &cur.bright_max);
                 }
