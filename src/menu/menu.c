@@ -29,7 +29,6 @@ int main(int argc, char **argv) {
 
     int rows, cols;
     getmaxyx(stdscr, rows, cols);
-
     WINDOW *win = recreate_window(&rows, &cols);
     if (!win) {
         win = newwin(rows - 2, cols - 2, 1, 1);
@@ -38,7 +37,6 @@ int main(int argc, char **argv) {
     }
 
     int highlight = 0;
-
     char gammatui_path[PATH_MAX] = {0};
     bool gammatui_built = build_gammatui_path(gammatui_path, sizeof gammatui_path, (argc > 0) ? argv[0] : NULL);
     bool gammatui_ok = gammatui_built && is_executable_file(gammatui_path);
@@ -48,16 +46,13 @@ int main(int argc, char **argv) {
     bool settings_ok = settings_built && is_executable_file(settings_path);
 
     draw_menu(win, highlight);
-
     bool running = true;
     while (running) {
         int ch = wgetch(win);
-
         if (ch == KEY_RESIZE) {
             endwin();
             refresh();
             getmaxyx(stdscr, rows, cols);
-            
             if (win) delwin(win);
             win = recreate_window(&rows, &cols);
             draw_menu(win, highlight);
@@ -66,9 +61,9 @@ int main(int argc, char **argv) {
 
         if (ch == ERR) continue;
 
-        if (ch == KEY_UP)
+        if (ch == 'w' || ch == 'W')
             highlight = (highlight + 3 - 1) % 3;
-        else if (ch == KEY_DOWN)
+        else if (ch == 's' || ch == 'S')
             highlight = (highlight + 1) % 3;
         else if (ch == 'q' || ch == 'Q')
             running = false;
@@ -78,24 +73,19 @@ int main(int argc, char **argv) {
 
                 if (!gammatui_ok) {
                     show_message(win, "Not found",
-                                 "Expected ../gammatui/gammatui.elf relative to menu.elf\nPlace gammatui.elf at ../gammatui/gammatui.elf and make it executable.");
+                        "Expected ../gammatui/gammatui.elf relative to menu.elf\nPlace gammatui.elf at ../gammatui/gammatui.elf and make it executable.");
                 } else {
                     flushinp();
-                    
                     def_prog_mode();
                     endwin();
-                    
                     int rc = spawn_and_wait(gammatui_path);
-                    
                     struct timespec ts = {0, 100000000L};
                     nanosleep(&ts, NULL);
-                    
                     reset_prog_mode();
                     refresh();
-                    
                     if (win) delwin(win);
                     win = recreate_window(&rows, &cols);
-                    
+
                     if (rc == 0)
                         gammatui_ok = is_executable_file(gammatui_path);
                     else if (rc == -1)
@@ -117,23 +107,19 @@ int main(int argc, char **argv) {
 
                 if (!settings_ok) {
                     show_message(win, "Not found",
-                                 "Expected ../settings/brightnesstui.elf relative to menu.elf\nPlace brightnesstui.elf at ../settings/brightnesstui.elf and make it executable.");
+                        "Expected ../settings/brightnesstui.elf relative to menu.elf\nPlace brightnesstui.elf at ../settings/brightnesstui.elf and make it executable.");
                 } else {
                     flushinp();
                     def_prog_mode();
                     endwin();
-                    
                     int rc = spawn_and_wait(settings_path);
-                    
                     struct timespec ts = {0, 100000000L};
                     nanosleep(&ts, NULL);
-                    
                     reset_prog_mode();
                     refresh();
-
                     if (win) delwin(win);
                     win = recreate_window(&rows, &cols);
-                    
+
                     if (rc == 0)
                         settings_ok = is_executable_file(settings_path);
                     else if (rc == -1)
@@ -154,10 +140,8 @@ int main(int argc, char **argv) {
                 running = false;
             }
         }
-
         if (running) draw_menu(win, highlight);
     }
-
     if (active_child > 0)
         terminate_child_group(active_child);
     if (win)
