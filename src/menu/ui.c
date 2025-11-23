@@ -6,11 +6,20 @@
 const char *MENU_TITLE = "gammatui - Main Menu";
 const char *menu_items[] = { "Adjustment", "Settings", "Quit" };
 
-void draw_menu(WINDOW *w,int hl){
+void draw_menu(WINDOW *w, int hl, int k_up, int k_down, int k_sel, int k_quit){
     if(!w) return;
     werase(w); box(w,0,0);
     mvwprintw(w,1,2,"%s",MENU_TITLE);
-    mvwprintw(w,2,2,"Use w/s to move, Enter to select");
+
+    const char *kn_up = keyname(k_up); if(!kn_up) kn_up="?";
+    const char *kn_dn = keyname(k_down); if(!kn_dn) kn_dn="?";
+    const char *kn_sl = keyname(k_sel); if(!kn_sl) kn_sl="?";
+    const char *kn_qt = keyname(k_quit); if(!kn_qt) kn_qt="?";
+
+    char help[128];
+    snprintf(help, sizeof(help), "Use %s/%s to move, %s to select, %s to quit", kn_up, kn_dn, kn_sl, kn_qt);
+    mvwprintw(w, 2, 2, "%s", help);
+
     for(int i=0,y=5;i<3;++i){
         if(i==hl) wattron(w,A_REVERSE|A_BOLD);
         mvwprintw(w,y+i,4,"%s",menu_items[i]);
