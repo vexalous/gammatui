@@ -19,6 +19,10 @@ static const char *UI_FIELDS[] = {
     "Bright Max",
     "Sel Color",
     "Unsel Color",
+    "Key Up",
+    "Key Down",
+    "Key Select",
+    "Key Quit",
     "Save Config"
 };
 
@@ -39,6 +43,10 @@ enum {
     FI_BRIGHT_MAX,
     FI_SEL_COLOR,
     FI_UNSEL_COLOR,
+    FI_KEY_UP,
+    FI_KEY_DOWN,
+    FI_KEY_SELECT,
+    FI_KEY_QUIT,
     FI_SAVE,
     FI_COUNT
 };
@@ -149,11 +157,61 @@ static void edit_double(WINDOW *w, int row, int col, double *val) {
     }
 }
 
+static int normalize_key(int k) {
+    if (k >= 'A' && k <= 'Z') return k + 32;
+    return k;
+}
+
+static const char* get_action_name_for_key(const struct cfg *c, int key) {
+    int nk = normalize_key(key);
+    if (nk == normalize_key(c->key_up)) return "Move Up";
+    if (nk == normalize_key(c->key_down)) return "Move Down";
+    if (nk == normalize_key(c->key_select)) return "Select";
+    if (nk == normalize_key(c->key_quit)) return "Quit";
+    return NULL;
+}
+
+static void edit_key(WINDOW *w, int row, int col, int *val, const struct cfg *full_cfg, int current_field) {
+    curs_set(1);
+    mvwprintw(w, row, col, "Press New Key...");
+    wrefresh(w);
+    int ch = wgetch(w);
+    
+    if (ch != ERR && ch != 27) {
+        const char *conflict = get_action_name_for_key(full_cfg, ch);
+        
+        bool self_collision = false;
+        if (conflict) {
+            if (current_field == FI_KEY_UP && strcmp(conflict, "Move Up") == 0) self_collision = true;
+            else if (current_field == FI_KEY_DOWN && strcmp(conflict, "Move Down") == 0) self_collision = true;
+            else if (current_field == FI_KEY_SELECT && strcmp(conflict, "Select") == 0) self_collision = true;
+            else if (current_field == FI_KEY_QUIT && strcmp(conflict, "Quit") == 0) self_collision = true;
+        }
+
+        if (conflict && !self_collision) {
+            char buf[128];
+            snprintf(buf, sizeof(buf), "Key already set to: %s", conflict);
+            show_message(w, "Error", buf);
+        } else {
+            *val = ch;
+        }
+    }
+    curs_set(0);
+}
+
 static void draw_form(WINDOW *w, const struct cfg *c, int highlight) {
     werase(w);
     box(w, 0, 0);
     mvwprintw(w, 1, 2, "%s", TITLE);
-    mvwprintw(w, 2, 2, "w/s: Move | Enter: Edit/Save | a/d: Cycle Color | Q: Quit");
+    
+    const char *k_u = keyname(c->key_up); if(!k_u) k_u="?";
+    const char *k_d = keyname(c->key_down); if(!k_d) k_d="?";
+    const char *k_s = keyname(c->key_select); if(!k_s) k_s="?";
+    const char *k_q = keyname(c->key_quit); if(!k_q) k_q="?";
+
+    char help[256];
+    snprintf(help, sizeof(help), "Move:%s/%s | %s:Edit | %s:Quit", k_u, k_d, k_s, k_q);
+    mvwprintw(w, 2, 2, "%s", help);
 
     for (int i = 0; i < FI_COUNT; ++i) {
         int current_row = UI_START_ROW + i * UI_ROW_STEP;
@@ -183,6 +241,14 @@ static void draw_form(WINDOW *w, const struct cfg *c, int highlight) {
         } else if (i == FI_UNSEL_COLOR) {
             int idx = c->unselected_color & 7;
             mvwprintw(w, current_row, UI_VALUE_COL, "%s", COLOR_NAMES[idx]);
+        } else if (i == FI_KEY_UP) {
+            mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_up));
+        } else if (i == FI_KEY_DOWN) {
+            mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_down));
+        } else if (i == FI_KEY_SELECT) {
+            mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_select));
+        } else if (i == FI_KEY_QUIT) {
+            mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_quit));
         }
     }
     wrefresh(w);
@@ -206,6 +272,10 @@ int main(int argc, char **argv) {
         cur.bright_max = 2.0;
         cur.selected_color = 7;
         cur.unselected_color = 5;
+        cur.key_up = 'w';
+        cur.key_down = 's';
+        cur.key_select = 10;
+        cur.key_quit = 'q';
     }
 
     initscr();
@@ -228,68 +298,72 @@ int main(int argc, char **argv) {
             dirty = false;
         }
         int ch = wgetch(win);
-        switch (ch) {
-            case 'w':
-            case 'W':
-                if (highlight > 0) { highlight--; dirty = true; }
-                break;
-            case 's':
-            case 'S':
-                if (highlight < FI_COUNT - 1) { highlight++; dirty = true; }
-                break;
-            case 'a':
-            case 'A':
-                if (highlight == FI_SEL_COLOR) {
-                    cur.selected_color = (cur.selected_color + 7) % 8;
-                    dirty = true;
-                } else if (highlight == FI_UNSEL_COLOR) {
-                    cur.unselected_color = (cur.unselected_color + 7) % 8;
-                    dirty = true;
-                }
-                break;
-            case 'd':
-            case 'D':
-                if (highlight == FI_SEL_COLOR) {
-                    cur.selected_color = (cur.selected_color + 1) % 8;
-                    dirty = true;
-                } else if (highlight == FI_UNSEL_COLOR) {
-                    cur.unselected_color = (cur.unselected_color + 1) % 8;
-                    dirty = true;
-                }
-                break;
-            case '\n':
-            case KEY_ENTER: {
-                int row = UI_START_ROW + highlight * UI_ROW_STEP;
-                if (highlight == FI_SAVE) {
-                    if (save_config(&cur, cfgpath)) {
-                        show_message(win, "Saved", "Configuration saved successfully.");
-                    } else {
-                        show_message(win, "Error", "Failed to save configuration.");
-                    }
-                } else if (highlight == FI_OUTPUT) {
-                    edit_string(win, row, UI_VALUE_COL, cur.output, sizeof(cur.output));
-                } else if (highlight == FI_GAMMA_MIN) {
-                    edit_double(win, row, UI_VALUE_COL, &cur.gamma_min);
-                } else if (highlight == FI_GAMMA_MAX) {
-                    edit_double(win, row, UI_VALUE_COL, &cur.gamma_max);
-                } else if (highlight == FI_BRIGHT_MIN) {
-                    edit_double(win, row, UI_VALUE_COL, &cur.bright_min);
-                } else if (highlight == FI_BRIGHT_MAX) {
-                    edit_double(win, row, UI_VALUE_COL, &cur.bright_max);
-                }
+
+        int check_ch = normalize_key(ch);
+        int check_up = normalize_key(cur.key_up);
+        int check_down = normalize_key(cur.key_down);
+        int check_sel = normalize_key(cur.key_select);
+        int check_quit = normalize_key(cur.key_quit);
+
+        if (check_ch == check_up) {
+             if (highlight > 0) { highlight--; dirty = true; }
+        } else if (check_ch == check_down) {
+             if (highlight < FI_COUNT - 1) { highlight++; dirty = true; }
+        } else if (check_ch == check_quit) {
+            running = false;
+        } else if (ch == KEY_RESIZE) {
+            getmaxyx(stdscr, rows, cols);
+            wresize(win, rows - 2, cols - 2);
+            mvwin(win, 1, 1);
+            dirty = true;
+        } else if (ch == 'a' || ch == 'A') {
+             if (highlight == FI_SEL_COLOR) {
+                cur.selected_color = (cur.selected_color + 7) % 8;
                 dirty = true;
-                break;
+            } else if (highlight == FI_UNSEL_COLOR) {
+                cur.unselected_color = (cur.unselected_color + 7) % 8;
+                dirty = true;
             }
-            case 'q':
-            case 'Q':
-                running = false;
-                break;
-            case KEY_RESIZE:
-                getmaxyx(stdscr, rows, cols);
-                wresize(win, rows - 2, cols - 2);
-                mvwin(win, 1, 1);
+        } else if (ch == 'd' || ch == 'D') {
+             if (highlight == FI_SEL_COLOR) {
+                cur.selected_color = (cur.selected_color + 1) % 8;
                 dirty = true;
-                break;
+            } else if (highlight == FI_UNSEL_COLOR) {
+                cur.unselected_color = (cur.unselected_color + 1) % 8;
+                dirty = true;
+            }
+        } else if (check_ch == check_sel || ch == KEY_ENTER) {
+            if (check_ch != check_sel) {
+                continue;
+            }
+
+            int row = UI_START_ROW + highlight * UI_ROW_STEP;
+            if (highlight == FI_SAVE) {
+                if (save_config(&cur, cfgpath)) {
+                    show_message(win, "Saved", "Configuration saved successfully.");
+                } else {
+                    show_message(win, "Error", "Failed to save configuration.");
+                }
+            } else if (highlight == FI_OUTPUT) {
+                edit_string(win, row, UI_VALUE_COL, cur.output, sizeof(cur.output));
+            } else if (highlight == FI_GAMMA_MIN) {
+                edit_double(win, row, UI_VALUE_COL, &cur.gamma_min);
+            } else if (highlight == FI_GAMMA_MAX) {
+                edit_double(win, row, UI_VALUE_COL, &cur.gamma_max);
+            } else if (highlight == FI_BRIGHT_MIN) {
+                edit_double(win, row, UI_VALUE_COL, &cur.bright_min);
+            } else if (highlight == FI_BRIGHT_MAX) {
+                edit_double(win, row, UI_VALUE_COL, &cur.bright_max);
+            } else if (highlight == FI_KEY_UP) {
+                edit_key(win, row, UI_VALUE_COL, &cur.key_up, &cur, FI_KEY_UP);
+            } else if (highlight == FI_KEY_DOWN) {
+                edit_key(win, row, UI_VALUE_COL, &cur.key_down, &cur, FI_KEY_DOWN);
+            } else if (highlight == FI_KEY_SELECT) {
+                edit_key(win, row, UI_VALUE_COL, &cur.key_select, &cur, FI_KEY_SELECT);
+            } else if (highlight == FI_KEY_QUIT) {
+                edit_key(win, row, UI_VALUE_COL, &cur.key_quit, &cur, FI_KEY_QUIT);
+            }
+            dirty = true;
         }
     }
     delwin(win);
