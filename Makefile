@@ -22,6 +22,13 @@ GAMMATUI_OBJS = $(patsubst src/gammatui/%.c, $(GAMMATUI_DIR)/%.o, $(GAMMATUI_SRC
 MENU_OBJS = $(patsubst src/menu/%.c, $(MENU_DIR)/%.o, $(MENU_SRCS))
 SETTINGS_OBJS = $(patsubst src/settings/%.c, $(SETTINGS_DIR)/%.o, $(SETTINGS_SRCS))
 
+PREFIX ?= $(HOME)/.local
+BINDIR ?= $(PREFIX)/bin
+LIBDIR ?= $(PREFIX)/lib
+DATADIR ?= $(PREFIX)/share
+APPSDIR ?= $(DATADIR)/applications
+INSTALL_DIR = $(LIBDIR)/gammatui
+
 all: $(TARGET_MENU) $(TARGET_GAMMATUI) $(TARGET_SETTINGS)
 
 $(TARGET_GAMMATUI): $(GAMMATUI_OBJS)
@@ -58,8 +65,42 @@ run: all
 	@echo "Starting application..."
 	@$(TARGET_MENU)
 
+install: all
+	@echo "Installing libraries to $(DESTDIR)$(INSTALL_DIR)..."
+	@mkdir -p $(DESTDIR)$(INSTALL_DIR)/menu
+	@mkdir -p $(DESTDIR)$(INSTALL_DIR)/gammatui
+	@mkdir -p $(DESTDIR)$(INSTALL_DIR)/settings
+	install -m 755 $(TARGET_MENU) $(DESTDIR)$(INSTALL_DIR)/menu/menu.elf
+	install -m 755 $(TARGET_GAMMATUI) $(DESTDIR)$(INSTALL_DIR)/gammatui/gammatui.elf
+	install -m 755 $(TARGET_SETTINGS) $(DESTDIR)$(INSTALL_DIR)/settings/brightnesstui.elf
+	install -m 644 src/settings/config.json $(DESTDIR)$(INSTALL_DIR)/settings/config.json
+	
+	@echo "Installing binary symlink to $(DESTDIR)$(BINDIR)..."
+	@mkdir -p $(DESTDIR)$(BINDIR)
+	@ln -sf $(INSTALL_DIR)/menu/menu.elf $(DESTDIR)$(BINDIR)/gammatui
+	
+	@echo "Installing desktop entry to $(DESTDIR)$(APPSDIR)..."
+	@mkdir -p $(DESTDIR)$(APPSDIR)
+	@echo "[Desktop Entry]" > $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Type=Application" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Name=gammatui" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Comment=A tui to adjust effects such as gamma and brightness for an output. Written in c." >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Exec=$(BINDIR)/gammatui" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Terminal=true" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Categories=Utility;Settings;" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Icon=utilities-terminal" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
+
+	@echo "Installation complete."
+
+uninstall:
+	@echo "Uninstalling from $(DESTDIR)$(INSTALL_DIR)..."
+	@rm -f $(DESTDIR)$(BINDIR)/gammatui
+	@rm -rf $(DESTDIR)$(INSTALL_DIR)
+	@rm -f $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Uninstallation complete."
+
 clean:
 	@echo "Cleaning up build files..."
 	@rm -rf $(BUILD_DIR)
 
-.PHONY: all clean run
+.PHONY: all clean run install uninstall
