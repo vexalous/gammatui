@@ -16,6 +16,10 @@ struct cfg {
     double bright_max;
     int selected_color;
     int unselected_color;
+    int key_up;
+    int key_down;
+    int key_select;
+    int key_quit; 
 };
 
 bool config_path_for_exe(char *out, size_t outlen, const char *argv0);
