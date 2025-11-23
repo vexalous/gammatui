@@ -1,6 +1,7 @@
 #define _XOPEN_SOURCE 700
 #include "gammatui.h"
 #include "gamma_control.h"
+#include "settings.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,57 +12,24 @@
 #include <unistd.h>
 #include <libgen.h>
 
-static double config_gamma_min = 0.1;
-static double config_gamma_max = 10.0;
-static double config_bright_min = 0.1;
-static double config_bright_max = 2.0;
-static int config_sel_color = 7;
-static int config_unsel_color = 5;
+static struct cfg config;
 
-static void load_config_limits(const char *argv0) {
-    char exe_path[PATH_MAX] = {0};
-#if defined(linux)
-    ssize_t n = readlink("/proc/self/exe", exe_path, sizeof(exe_path)-1);
-    if (n > 0) exe_path[n] = '\0';
-#endif
-    if (exe_path[0] == '\0' && argv0) {
-        if (realpath(argv0, exe_path) == NULL) {
-            strncpy(exe_path, argv0, sizeof(exe_path)-1);
+static void load_app_config(const char *argv0) {
+    char cfgpath[PATH_MAX];
+    if (config_path_for_exe(cfgpath, sizeof(cfgpath), argv0)) {
+        if (!load_config(&config, cfgpath)) {
+            config.gamma_min = 0.1;
+            config.gamma_max = 10.0;
+            config.bright_min = 0.1;
+            config.bright_max = 2.0;
+            config.selected_color = 7;
+            config.unselected_color = 5;
+            config.key_up = 'w';
+            config.key_down = 's';
+            config.key_select = 10;
+            config.key_quit = 'q';
         }
     }
-    char *dir = dirname(exe_path);
-    char config_path[PATH_MAX];
-    snprintf(config_path, sizeof(config_path), "%s/../settings/config.json", dir);
-
-    FILE *f = fopen(config_path, "r");
-    if (!f) return;
-
-    char line[256];
-    while (fgets(line, sizeof(line), f)) {
-        char *key = line;
-        while (isspace((unsigned char)*key)) key++;
-
-        if (strncmp(key, "\"gamma_min\"", 11) == 0) {
-            char *p = strchr(key, ':');
-            if (p) config_gamma_min = strtod(p + 1, NULL);
-        } else if (strncmp(key, "\"gamma_max\"", 11) == 0) {
-            char *p = strchr(key, ':');
-            if (p) config_gamma_max = strtod(p + 1, NULL);
-        } else if (strncmp(key, "\"brightness_min\"", 16) == 0 || strncmp(key, "\"bright_min\"", 12) == 0) {
-            char *p = strchr(key, ':');
-            if (p) config_bright_min = strtod(p + 1, NULL);
-        } else if (strncmp(key, "\"brightness_max\"", 16) == 0 || strncmp(key, "\"bright_max\"", 12) == 0) {
-            char *p = strchr(key, ':');
-            if (p) config_bright_max = strtod(p + 1, NULL);
-        } else if (strncmp(key, "\"selected_color\"", 16) == 0) {
-            char *p = strchr(key, ':');
-            if (p) config_sel_color = (int)strtol(p + 1, NULL, 10);
-        } else if (strncmp(key, "\"unselected_color\"", 18) == 0) {
-            char *p = strchr(key, ':');
-            if (p) config_unsel_color = (int)strtol(p + 1, NULL, 10);
-        }
-    }
-    fclose(f);
 }
 
 static void handle_resize(WINDOW **win, int *rows, int *cols) {
@@ -78,8 +46,13 @@ static void handle_resize(WINDOW **win, int *rows, int *cols) {
     }
 }
 
+static int normalize_key(int k) {
+    if (k >= 'A' && k <= 'Z') return k + 32;
+    return k;
+}
+
 int main(int argc, char **argv) {
-    load_config_limits(argc > 0 ? argv[0] : NULL);
+    load_app_config(argc > 0 ? argv[0] : NULL);
     int opt;
     static struct option long_options[] = {
         {"help", no_argument, 0, 'h'},
@@ -111,8 +84,8 @@ int main(int argc, char **argv) {
         display_output[0] = '\0';
     }
 
-    double gamma = clamp_double(1.0, config_gamma_min, config_gamma_max);
-    double bright = clamp_double(1.0, config_bright_min, config_bright_max);
+    double gamma = clamp_double(1.0, config.gamma_min, config.gamma_max);
+    double bright = clamp_double(1.0, config.bright_min, config.bright_max);
     int selected = 0;
     int rows, cols;
 
@@ -121,7 +94,7 @@ int main(int argc, char **argv) {
     noecho();
     keypad(stdscr, TRUE);
     curs_set(0);
-    if (has_colors()) init_colors_safe(config_sel_color, config_unsel_color);
+    if (has_colors()) init_colors_safe(config.selected_color, config.unselected_color);
     getmaxyx(stdscr, rows, cols);
     if (rows < 5 || cols < 10) {
         endwin();
@@ -131,71 +104,71 @@ int main(int argc, char **argv) {
 
     WINDOW *win = newwin(rows - 2, cols - 2, 1, 1);
     nodelay(stdscr, FALSE);
-    draw_ui(win, gamma, bright, selected, rows - 2, cols - 2);
+    draw_ui(win, gamma, bright, selected, rows - 2, cols - 2, 
+            config.key_up, config.key_down, config.key_select, config.key_quit);
 
     int ch;
     bool running = true;
     while (running && (ch = getch()) != ERR) {
         bool needs_redraw = false;
         bool needs_apply = false;
-        switch (ch) {
-            case 'q':
-            case 'Q':
-                running = false;
-                break;
-            case 'w':
-            case 'W':
-            case 's':
-            case 'S':
-                selected = 1 - selected;
-                needs_redraw = true;
-                break;
-            case '/': {
-                char buf[32] = {0};
-                int h = getmaxy(win);
-                curs_set(1);
-                echo();
-                mvwprintw(win, h - 2, 2, "Set Value: ");
-                wrefresh(win);
-                wgetnstr(win, buf, sizeof(buf) - 1);
-                noecho();
-                curs_set(0);
-                char *endptr;
-                double val = strtod(buf, &endptr);
-                if (endptr != buf) {
-                    if (selected == 0) {
-                        if (val >= config_gamma_min && val <= config_gamma_max) {
-                            gamma = val;
-                            needs_apply = true;
-                        }
-                    } else {
-                        if (val >= config_bright_min && val <= config_bright_max) {
-                            bright = val;
-                            needs_apply = true;
-                        }
+        
+        int check_ch = normalize_key(ch);
+        int check_up = normalize_key(config.key_up);
+        int check_down = normalize_key(config.key_down);
+        int check_sel = normalize_key(config.key_select);
+        int check_quit = normalize_key(config.key_quit);
+
+        if (check_ch == check_quit) {
+            running = false;
+        } else if (check_ch == check_up) {
+            selected = 0;
+            needs_redraw = true;
+        } else if (check_ch == check_down) {
+            selected = 1;
+            needs_redraw = true;
+        } else if (check_ch == check_sel) {
+            char buf[32] = {0};
+            int h = getmaxy(win);
+            curs_set(1);
+            echo();
+            mvwprintw(win, h - 2, 2, "Set Value: ");
+            wrefresh(win);
+            wgetnstr(win, buf, sizeof(buf) - 1);
+            noecho();
+            curs_set(0);
+            char *endptr;
+            double val = strtod(buf, &endptr);
+            if (endptr != buf) {
+                if (selected == 0) {
+                    if (val >= config.gamma_min && val <= config.gamma_max) {
+                        gamma = val;
+                        needs_apply = true;
+                    }
+                } else {
+                    if (val >= config.bright_min && val <= config.bright_max) {
+                        bright = val;
+                        needs_apply = true;
                     }
                 }
-                needs_redraw = true;
-                break;
             }
-            case 'r':
-            case 'R':
-                gamma = clamp_double(1.0, config_gamma_min, config_gamma_max);
-                bright = clamp_double(1.0, config_bright_min, config_bright_max);
-                apply_values(gamma, bright);
-                needs_redraw = true;
-                break;
-            case KEY_RESIZE:
-                handle_resize(&win, &rows, &cols);
-                needs_redraw = true;
-                break;
+            needs_redraw = true;
+        } else if (ch == 'r' || ch == 'R') {
+            gamma = clamp_double(1.0, config.gamma_min, config.gamma_max);
+            bright = clamp_double(1.0, config.bright_min, config.bright_max);
+            apply_values(gamma, bright);
+            needs_redraw = true;
+        } else if (ch == KEY_RESIZE) {
+            handle_resize(&win, &rows, &cols);
+            needs_redraw = true;
         }
 
         if (needs_apply && debounce_allow()) {
             apply_values(gamma, bright);
         }
         if (needs_redraw) {
-            draw_ui(win, gamma, bright, selected, rows - 2, cols - 2);
+            draw_ui(win, gamma, bright, selected, rows - 2, cols - 2,
+                    config.key_up, config.key_down, config.key_select, config.key_quit);
         }
     }
     delwin(win);
