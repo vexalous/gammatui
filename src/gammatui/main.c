@@ -103,13 +103,14 @@ int main(int argc, char **argv) {
     }
 
     WINDOW *win = newwin(rows - 2, cols - 2, 1, 1);
-    nodelay(stdscr, FALSE);
+    keypad(win, TRUE);
+    
     draw_ui(win, gamma, bright, selected, rows - 2, cols - 2, 
             config.key_up, config.key_down, config.key_select, config.key_quit);
 
     int ch;
     bool running = true;
-    while (running && (ch = getch()) != ERR) {
+    while (running && (ch = wgetch(win)) != ERR) {
         bool needs_redraw = false;
         bool needs_apply = false;
         
