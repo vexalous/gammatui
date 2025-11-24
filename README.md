@@ -2,7 +2,7 @@
 
 A minimal tui to adjust gamma and brightness for an output.
 
-**CURRENTLY ONLY SUPPORTS x11, WAYLAND SUPPORT IS PLANNED.**
+**Currently only supports x11, wayland support is planned.**
 
 ## Quick Start
 ```bash
