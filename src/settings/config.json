@@ -1,5 +1,13 @@
 {
   "output": "eDP-1",
+  "gamma_min": 0.100,
   "gamma_max": 3.000,
-  "brightness_max": 2.000
+  "brightness_min": 0.100,
+  "brightness_max": 2.000,
+  "selected_color": 7,
+  "unselected_color": 5,
+  "key_up": 119,
+  "key_down": 115,
+  "key_select": 10,
+  "key_quit": 113
 }
