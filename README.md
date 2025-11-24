@@ -4,7 +4,7 @@ A minimal tui to adjust gamma and brightness for an output.
 
 **Currently only supports x11, wayland support is planned.**
 
-# X11 Instructions
+# x11 Instructions
 Ensure xrandr is installed.
 ```bash
 git clone https://github.com/vexalous/gammatui
