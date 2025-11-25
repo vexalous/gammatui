@@ -1,6 +1,6 @@
 # gammatui
 
-A minimal tui to adjust gamma and brightness for an output.
+A minimal text user interface to adjust gamma and brightness for an output.
 
 **Currently only supports x11, wayland support is planned.**
 
