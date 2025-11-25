@@ -1,6 +1,6 @@
 # gammatui
 
-A, lightweight, highly customizable text user interface to adjust gamma, brightness, and related effects for an output.
+A lightweight, highly customizable text user interface to adjust gamma, brightness, and related effects for an output.
 
 **Currently only supports x11, wayland support is planned.**
 
