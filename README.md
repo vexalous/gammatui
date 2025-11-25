@@ -9,7 +9,7 @@ First, ensure xrandr is installed.
    
 ---
 
-Then clone the github  repository.
+Then clone the github repository.
 ```bash
 git clone https://github.com/vexalous/gammatui
 ```
