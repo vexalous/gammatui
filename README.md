@@ -5,7 +5,7 @@ A lightweight, highly customizable text user interface to adjust gamma, brightne
 **Currently only supports x11, wayland support is planned.**
 
 # x11 Instructions
-First, ensure xrandr is installed.
+First, ensure that xrandr is installed.
    
 ---
 
