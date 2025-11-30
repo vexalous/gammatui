@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ncurses.h>
+#include <math.h>
 #include "gammatui.h"
 
 enum {
@@ -16,18 +17,50 @@ enum {
     COLOR_PAIR_HELP
 };
 
-void init_colors_safe(int sel, int unsel) {
+static int nearest_std_color(int r, int g, int b) {
+    double min_d = 1e9;
+    int best = 0;
+    int stds[8][3] = {
+        {0,0,0}, {1000,0,0}, {0,1000,0}, {1000,1000,0},
+        {0,0,1000}, {1000,0,1000}, {0,1000,1000}, {1000,1000,1000}
+    };
+    for(int i=0; i<8; i++) {
+        double d = pow(r - stds[i][0], 2) + pow(g - stds[i][1], 2) + pow(b - stds[i][2], 2);
+        if (d < min_d) { min_d = d; best = i; }
+    }
+    return best;
+}
+
+void init_colors_safe(int sr, int sg, int sb, int ur, int ug, int ub) {
     if (!has_colors()) return;
     start_color();
     use_default_colors();
+    
+    int sr_n = sr * 1000 / 255;
+    int sg_n = sg * 1000 / 255;
+    int sb_n = sb * 1000 / 255;
+    int ur_n = ur * 1000 / 255;
+    int ug_n = ug * 1000 / 255;
+    int ub_n = ub * 1000 / 255;
+
+    short sel_idx, unsel_idx;
+
+    if (can_change_color()) {
+        init_color(20, (short)sr_n, (short)sg_n, (short)sb_n);
+        init_color(21, (short)ur_n, (short)ug_n, (short)ub_n);
+        sel_idx = 20;
+        unsel_idx = 21;
+    } else {
+        sel_idx = (short)nearest_std_color(sr_n, sg_n, sb_n);
+        unsel_idx = (short)nearest_std_color(ur_n, ug_n, ub_n);
+    }
+
     init_pair(COLOR_PAIR_DEFAULT, COLOR_WHITE, -1);
     init_pair(COLOR_PAIR_TITLE, COLOR_CYAN, -1);
     init_pair(COLOR_PAIR_HEADER, COLOR_YELLOW, -1);
-    
-    init_pair(COLOR_PAIR_LABEL, (short)unsel, -1);
-    init_pair(COLOR_PAIR_VALUE, (short)unsel, -1);
-    init_pair(COLOR_PAIR_VALUE_SELECTED, (short)sel, -1);
-    
+    init_pair(COLOR_PAIR_LABEL, unsel_idx, -1);
+    init_pair(COLOR_PAIR_VALUE, unsel_idx, -1);
+    init_pair(COLOR_PAIR_VALUE_SELECTED, sel_idx, -1);
     init_pair(COLOR_PAIR_BAR_FILL, COLOR_GREEN, -1);
     init_pair(COLOR_PAIR_BAR_EMPTY, COLOR_WHITE, -1);
     init_pair(COLOR_PAIR_HELP, COLOR_BLUE, -1);
@@ -104,4 +137,3 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
 
     wnoutrefresh(win);
     doupdate();
-}
