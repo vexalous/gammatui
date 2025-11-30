@@ -11,7 +11,7 @@ void xr_call_async(const char *output, const char *opt, const char *val);
 int debounce_allow(void);
 double clamp_double(double v, double lo, double hi);
 
-void init_colors_safe(int sel, int unsel);
+void init_colors_safe(int sr, int sg, int sb, int ur, int ug, int ub);
 void draw_bar(WINDOW *w, int y, int x, int width, double value, double lo, double hi);
 void draw_rounded_border(WINDOW *w);
 
@@ -22,5 +22,3 @@ void apply_values(double gamma, double bright);
 void revert_values(void);
 
 extern char display_output[128];
-
-#endif
