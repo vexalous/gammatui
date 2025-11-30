@@ -14,8 +14,8 @@ struct cfg {
     double gamma_max;
     double bright_min;
     double bright_max;
-    int selected_color;
-    int unselected_color;
+    int sel_r, sel_g, sel_b;
+    int unsel_r, unsel_g, unsel_b;
     int key_up;
     int key_down;
     int key_select;
@@ -23,7 +23,6 @@ struct cfg {
 };
 
 bool config_path_for_exe(char *out, size_t outlen, const char *argv0);
+void config_set_defaults(struct cfg *c);
 bool load_config(struct cfg *c, const char *path);
 bool save_config(const struct cfg *c, const char *path);
-
-#endif
