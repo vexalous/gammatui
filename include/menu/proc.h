@@ -10,5 +10,3 @@ void sigwinch_handler(int sig);
 void shutdown_handler(int sig);
 int spawn_and_wait(const char *binpath);
 void terminate_child_group(pid_t childpid);
-
-#endif
