@@ -17,8 +17,12 @@ static const char *UI_FIELDS[] = {
     "Gamma Max",
     "Bright Min",
     "Bright Max",
-    "Sel Color",
-    "Unsel Color",
+    "Sel Red",
+    "Sel Green",
+    "Sel Blue",
+    "Unsel Red",
+    "Unsel Green",
+    "Unsel Blue",
     "Key Up",
     "Key Down",
     "Key Select",
@@ -29,11 +33,7 @@ static const char *UI_FIELDS[] = {
 #define UI_START_ROW 5
 #define UI_LABEL_COL 4
 #define UI_VALUE_COL 20
-#define UI_ROW_STEP 2
-
-static const char *COLOR_NAMES[] = {
-    "Black", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan", "White"
-};
+#define UI_ROW_STEP 1
 
 enum {
     FI_OUTPUT = 0,
@@ -41,8 +41,12 @@ enum {
     FI_GAMMA_MAX,
     FI_BRIGHT_MIN,
     FI_BRIGHT_MAX,
-    FI_SEL_COLOR,
-    FI_UNSEL_COLOR,
+    FI_SEL_R,
+    FI_SEL_G,
+    FI_SEL_B,
+    FI_UNSEL_R,
+    FI_UNSEL_G,
+    FI_UNSEL_B,
     FI_KEY_UP,
     FI_KEY_DOWN,
     FI_KEY_SELECT,
@@ -64,9 +68,7 @@ static void show_message(WINDOW *w, const char *title, const char *msg) {
 static void string_insert_char(char *str, int pos, int max_len, char ch) {
     int len = (int)strlen(str);
     if (len >= max_len - 1) return;
-    for (int i = len; i > pos; i--) {
-        str[i] = str[i-1];
-    }
+    for (int i = len; i > pos; i--) str[i] = str[i-1];
     str[pos] = ch;
     str[len + 1] = '\0';
 }
@@ -74,17 +76,15 @@ static void string_insert_char(char *str, int pos, int max_len, char ch) {
 static void string_delete_char(char *str, int pos) {
     int len = (int)strlen(str);
     if (pos >= len) return;
-    for (int i = pos; i < len; i++) {
-        str[i] = str[i+1];
-    }
+    for (int i = pos; i < len; i++) str[i] = str[i+1];
 }
 
 static void edit_string(WINDOW *w, int row, int col, char *buf, size_t bufsz) {
     char scratch[OUTPUT_LEN + 1];
     if (bufsz > sizeof(scratch)) bufsz = sizeof(scratch);
+    
     memset(scratch, 0, sizeof(scratch));
-    strncpy(scratch, buf, bufsz - 1);
-    int pos = (int)strlen(scratch);
+    int pos = 0;
     int ch;
     bool editing = true;
 
@@ -105,9 +105,7 @@ static void edit_string(WINDOW *w, int row, int col, char *buf, size_t bufsz) {
                 snprintf(buf, bufsz, "%s", scratch);
                 editing = false;
                 break;
-            case 27:
-                editing = false;
-                break;
+            case 27: editing = false; break;
             case KEY_BACKSPACE:
             case 127:
             case 8:
@@ -117,9 +115,7 @@ static void edit_string(WINDOW *w, int row, int col, char *buf, size_t bufsz) {
                 }
                 break;
             case KEY_DC:
-                if (pos < (int)strlen(scratch)) {
-                    string_delete_char(scratch, pos);
-                }
+                if (pos < (int)strlen(scratch)) string_delete_char(scratch, pos);
                 break;
             case KEY_LEFT:
                 if (pos > 0) pos--;
@@ -127,12 +123,8 @@ static void edit_string(WINDOW *w, int row, int col, char *buf, size_t bufsz) {
             case KEY_RIGHT:
                 if (pos < (int)strlen(scratch)) pos++;
                 break;
-            case KEY_HOME:
-                pos = 0;
-                break;
-            case KEY_END:
-                pos = (int)strlen(scratch);
-                break;
+            case KEY_HOME: pos = 0; break;
+            case KEY_END: pos = (int)strlen(scratch); break;
             default:
                 if (isprint(ch)) {
                     if (strlen(scratch) < bufsz - 1) {
@@ -152,8 +144,19 @@ static void edit_double(WINDOW *w, int row, int col, double *val) {
     edit_string(w, row, col, tmp, sizeof(tmp));
     char *endptr;
     double v = strtod(tmp, &endptr);
+    if (endptr != tmp && *endptr == '\0') *val = v;
+}
+
+static void edit_int(WINDOW *w, int row, int col, int *val) {
+    char tmp[32];
+    snprintf(tmp, sizeof(tmp), "%d", *val);
+    edit_string(w, row, col, tmp, sizeof(tmp));
+    char *endptr;
+    long v = strtol(tmp, &endptr, 10);
     if (endptr != tmp && *endptr == '\0') {
-        *val = v;
+        if (v < 0) v = 0;
+        if (v > 255) v = 255;
+        *val = (int)v;
     }
 }
 
@@ -179,7 +182,6 @@ static void edit_key(WINDOW *w, int row, int col, int *val, const struct cfg *fu
     
     if (ch != ERR && ch != 27) {
         const char *conflict = get_action_name_for_key(full_cfg, ch);
-        
         bool self_collision = false;
         if (conflict) {
             if (current_field == FI_KEY_UP && strcmp(conflict, "Move Up") == 0) self_collision = true;
@@ -217,39 +219,26 @@ static void draw_form(WINDOW *w, const struct cfg *c, int highlight) {
         int current_row = UI_START_ROW + i * UI_ROW_STEP;
         if (i == highlight) wattron(w, A_REVERSE);
         
-        if (i == FI_SAVE) {
-            mvwprintw(w, current_row, UI_LABEL_COL, "[ %s ]", UI_FIELDS[i]);
-        } else {
-            mvwprintw(w, current_row, UI_LABEL_COL, "%s:", UI_FIELDS[i]);
-        }
+        if (i == FI_SAVE) mvwprintw(w, current_row, UI_LABEL_COL, "[ %s ]", UI_FIELDS[i]);
+        else mvwprintw(w, current_row, UI_LABEL_COL, "%s:", UI_FIELDS[i]);
         
         wattroff(w, A_REVERSE);
 
-        if (i == FI_OUTPUT) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%s", c->output[0] ? c->output : "(empty)");
-        } else if (i == FI_GAMMA_MIN) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->gamma_min);
-        } else if (i == FI_GAMMA_MAX) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->gamma_max);
-        } else if (i == FI_BRIGHT_MIN) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->bright_min);
-        } else if (i == FI_BRIGHT_MAX) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->bright_max);
-        } else if (i == FI_SEL_COLOR) {
-            int idx = c->selected_color & 7;
-            mvwprintw(w, current_row, UI_VALUE_COL, "%s", COLOR_NAMES[idx]);
-        } else if (i == FI_UNSEL_COLOR) {
-            int idx = c->unselected_color & 7;
-            mvwprintw(w, current_row, UI_VALUE_COL, "%s", COLOR_NAMES[idx]);
-        } else if (i == FI_KEY_UP) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_up));
-        } else if (i == FI_KEY_DOWN) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_down));
-        } else if (i == FI_KEY_SELECT) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_select));
-        } else if (i == FI_KEY_QUIT) {
-            mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_quit));
-        }
+        if (i == FI_OUTPUT) mvwprintw(w, current_row, UI_VALUE_COL, "%s", c->output[0] ? c->output : "(empty)");
+        else if (i == FI_GAMMA_MIN) mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->gamma_min);
+        else if (i == FI_GAMMA_MAX) mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->gamma_max);
+        else if (i == FI_BRIGHT_MIN) mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->bright_min);
+        else if (i == FI_BRIGHT_MAX) mvwprintw(w, current_row, UI_VALUE_COL, "%.3f", c->bright_max);
+        else if (i == FI_SEL_R) mvwprintw(w, current_row, UI_VALUE_COL, "%d", c->sel_r);
+        else if (i == FI_SEL_G) mvwprintw(w, current_row, UI_VALUE_COL, "%d", c->sel_g);
+        else if (i == FI_SEL_B) mvwprintw(w, current_row, UI_VALUE_COL, "%d", c->sel_b);
+        else if (i == FI_UNSEL_R) mvwprintw(w, current_row, UI_VALUE_COL, "%d", c->unsel_r);
+        else if (i == FI_UNSEL_G) mvwprintw(w, current_row, UI_VALUE_COL, "%d", c->unsel_g);
+        else if (i == FI_UNSEL_B) mvwprintw(w, current_row, UI_VALUE_COL, "%d", c->unsel_b);
+        else if (i == FI_KEY_UP) mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_up));
+        else if (i == FI_KEY_DOWN) mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_down));
+        else if (i == FI_KEY_SELECT) mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_select));
+        else if (i == FI_KEY_QUIT) mvwprintw(w, current_row, UI_VALUE_COL, "%s", keyname(c->key_quit));
     }
     wrefresh(w);
 }
@@ -257,25 +246,12 @@ static void draw_form(WINDOW *w, const struct cfg *c, int highlight) {
 int main(int argc, char **argv) {
     char cfgpath[PATH_MAX];
     const char *exe_name = (argc > 0) ? argv[0] : "gammatui";
-    if (!config_path_for_exe(cfgpath, sizeof(cfgpath), exe_name)) {
-        fprintf(stderr, "Unable to determine config path.\n");
-        return 1;
-    }
+    if (!config_path_for_exe(cfgpath, sizeof(cfgpath), exe_name)) return 1;
 
     struct cfg cur;
     if (!load_config(&cur, cfgpath)) {
-        memset(&cur, 0, sizeof(cur));
-        strncpy(cur.output, "eDP-1", OUTPUT_LEN - 1);
-        cur.gamma_min = 0.1;
-        cur.gamma_max = 10.0;
-        cur.bright_min = 0.1;
-        cur.bright_max = 2.0;
-        cur.selected_color = 7;
-        cur.unselected_color = 5;
-        cur.key_up = 'w';
-        cur.key_down = 's';
-        cur.key_select = 10;
-        cur.key_quit = 'q';
+        config_set_defaults(&cur);
+        save_config(&cur, cfgpath);
     }
 
     initscr();
@@ -316,57 +292,31 @@ int main(int argc, char **argv) {
             wresize(win, rows - 2, cols - 2);
             mvwin(win, 1, 1);
             dirty = true;
-        } else if (ch == 'a' || ch == 'A') {
-             if (highlight == FI_SEL_COLOR) {
-                cur.selected_color = (cur.selected_color + 7) % 8;
-                dirty = true;
-            } else if (highlight == FI_UNSEL_COLOR) {
-                cur.unselected_color = (cur.unselected_color + 7) % 8;
-                dirty = true;
-            }
-        } else if (ch == 'd' || ch == 'D') {
-             if (highlight == FI_SEL_COLOR) {
-                cur.selected_color = (cur.selected_color + 1) % 8;
-                dirty = true;
-            } else if (highlight == FI_UNSEL_COLOR) {
-                cur.unselected_color = (cur.unselected_color + 1) % 8;
-                dirty = true;
-            }
         } else if (check_ch == check_sel || ch == KEY_ENTER) {
-            if (check_ch != check_sel) {
-                continue;
-            }
+            if (check_ch != check_sel) continue;
 
             int row = UI_START_ROW + highlight * UI_ROW_STEP;
             if (highlight == FI_SAVE) {
-                if (save_config(&cur, cfgpath)) {
-                    show_message(win, "Saved", "Configuration saved successfully.");
-                } else {
-                    show_message(win, "Error", "Failed to save configuration.");
-                }
-            } else if (highlight == FI_OUTPUT) {
-                edit_string(win, row, UI_VALUE_COL, cur.output, sizeof(cur.output));
-            } else if (highlight == FI_GAMMA_MIN) {
-                edit_double(win, row, UI_VALUE_COL, &cur.gamma_min);
-            } else if (highlight == FI_GAMMA_MAX) {
-                edit_double(win, row, UI_VALUE_COL, &cur.gamma_max);
-            } else if (highlight == FI_BRIGHT_MIN) {
-                edit_double(win, row, UI_VALUE_COL, &cur.bright_min);
-            } else if (highlight == FI_BRIGHT_MAX) {
-                edit_double(win, row, UI_VALUE_COL, &cur.bright_max);
-            } else if (highlight == FI_KEY_UP) {
-                edit_key(win, row, UI_VALUE_COL, &cur.key_up, &cur, FI_KEY_UP);
-            } else if (highlight == FI_KEY_DOWN) {
-                edit_key(win, row, UI_VALUE_COL, &cur.key_down, &cur, FI_KEY_DOWN);
-            } else if (highlight == FI_KEY_SELECT) {
-                edit_key(win, row, UI_VALUE_COL, &cur.key_select, &cur, FI_KEY_SELECT);
-            } else if (highlight == FI_KEY_QUIT) {
-                edit_key(win, row, UI_VALUE_COL, &cur.key_quit, &cur, FI_KEY_QUIT);
-            }
+                if (save_config(&cur, cfgpath)) show_message(win, "Saved", "Configuration saved successfully.");
+                else show_message(win, "Error", "Failed to save configuration.");
+            } else if (highlight == FI_OUTPUT) edit_string(win, row, UI_VALUE_COL, cur.output, sizeof(cur.output));
+            else if (highlight == FI_GAMMA_MIN) edit_double(win, row, UI_VALUE_COL, &cur.gamma_min);
+            else if (highlight == FI_GAMMA_MAX) edit_double(win, row, UI_VALUE_COL, &cur.gamma_max);
+            else if (highlight == FI_BRIGHT_MIN) edit_double(win, row, UI_VALUE_COL, &cur.bright_min);
+            else if (highlight == FI_BRIGHT_MAX) edit_double(win, row, UI_VALUE_COL, &cur.bright_max);
+            else if (highlight == FI_SEL_R) edit_int(win, row, UI_VALUE_COL, &cur.sel_r);
+            else if (highlight == FI_SEL_G) edit_int(win, row, UI_VALUE_COL, &cur.sel_g);
+            else if (highlight == FI_SEL_B) edit_int(win, row, UI_VALUE_COL, &cur.sel_b);
+            else if (highlight == FI_UNSEL_R) edit_int(win, row, UI_VALUE_COL, &cur.unsel_r);
+            else if (highlight == FI_UNSEL_G) edit_int(win, row, UI_VALUE_COL, &cur.unsel_g);
+            else if (highlight == FI_UNSEL_B) edit_int(win, row, UI_VALUE_COL, &cur.unsel_b);
+            else if (highlight == FI_KEY_UP) edit_key(win, row, UI_VALUE_COL, &cur.key_up, &cur, FI_KEY_UP);
+            else if (highlight == FI_KEY_DOWN) edit_key(win, row, UI_VALUE_COL, &cur.key_down, &cur, FI_KEY_DOWN);
+            else if (highlight == FI_KEY_SELECT) edit_key(win, row, UI_VALUE_COL, &cur.key_select, &cur, FI_KEY_SELECT);
+            else if (highlight == FI_KEY_QUIT) edit_key(win, row, UI_VALUE_COL, &cur.key_quit, &cur, FI_KEY_QUIT);
             dirty = true;
         }
     }
     delwin(win);
     endwin();
     return 0;
-}
