@@ -22,3 +22,5 @@ void apply_values(double gamma, double bright);
 void revert_values(void);
 
 extern char display_output[128];
+
+#endif
