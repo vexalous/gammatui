@@ -137,3 +137,4 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
 
     wnoutrefresh(win);
     doupdate();
+}
