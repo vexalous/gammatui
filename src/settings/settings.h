@@ -26,3 +26,5 @@ bool config_path_for_exe(char *out, size_t outlen, const char *argv0);
 void config_set_defaults(struct cfg *c);
 bool load_config(struct cfg *c, const char *path);
 bool save_config(const struct cfg *c, const char *path);
+
+#endif
