@@ -320,3 +320,4 @@ int main(int argc, char **argv) {
     delwin(win);
     endwin();
     return 0;
+}
