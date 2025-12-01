@@ -133,3 +133,4 @@ bool save_config(const struct cfg *c, const char *path) {
         return false;
     }
     return true;
+}
