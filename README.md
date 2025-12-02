@@ -2,11 +2,13 @@
 
 A lightweight, highly customizable text user interface to adjust gamma, brightness, and related effects for an output.
 
-**Currently only supports x11, wayland support is planned.**
+**Gammatui supports both X11 and Wayland (wlroots-based compositors).**
 
-# x11 Instructions
-First, ensure that xrandr is installed.
-   
+# Dependencies
+For X11, ensure that `libx11-dev` and `libxrandr-dev` (or your distro's equivalent) are installed.
+
+For Wayland, ensure you are using a supported compositor (like Hyprland or Sway) and that `libwayland-dev` is installed.
+
 ---
 
 Then clone the github repository.
