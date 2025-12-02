@@ -20,3 +20,13 @@ Or, alternatively, download the zip and extract it.
 ---
 
 Lastly, run make install and launch the application from an app launcher like rofi, or run make and use make run to launch the application from the source code folder.
+
+## Star History
+
+<a href="https://www.star-history.com/#vexalous/gammatui&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=vexalous/gammatui&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=vexalous/gammatui&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=vexalous/gammatui&type=date&legend=top-left" />
+ </picture>
+</a>
