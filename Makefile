@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -std=c99 -pedantic-errors -Werror -Wall -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -Wunreachable-code -Iinclude -Isrc/settings -g
 LDFLAGS = -pthread
-LDLIBS_GAMMATUI = -lncurses -ltinfo -lX11 -lXrandr -lm
+LDLIBS_GAMMATUI = -lncurses -ltinfo -lX11 -lXrandr -lm -lwayland-client
 LDLIBS_MENU = -lncurses -ltinfo
 LDLIBS_SETTINGS = -lncurses -ltinfo
 
@@ -14,7 +14,7 @@ TARGET_MENU = $(MENU_DIR)/menu.elf
 TARGET_GAMMATUI = $(GAMMATUI_DIR)/gammatui.elf
 TARGET_SETTINGS = $(SETTINGS_DIR)/brightnesstui.elf
 
-GAMMATUI_SRCS = src/gammatui/main.c src/gammatui/ui.c src/gammatui/xrandr.c src/gammatui/gamma_control.c src/settings/config.c
+GAMMATUI_SRCS = src/gammatui/main.c src/gammatui/ui.c src/gammatui/xrandr.c src/gammatui/gamma_control.c src/gammatui/wlr-gamma-control-unstable-v1-protocol.c src/settings/config.c
 MENU_SRCS = src/menu/menu.c src/menu/proc.c src/menu/ui.c src/menu/utils.c src/settings/config.c
 SETTINGS_SRCS = src/settings/brightnesstui.c src/settings/config.c
 
