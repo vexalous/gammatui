@@ -3,6 +3,7 @@
 #include "ui.h"
 #include "utils.h"
 #include "settings.h"
+#include <ctype.h>
 #include <ncurses.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -11,77 +12,70 @@
 #include <unistd.h>
 #include <limits.h>
 
-#define KEY_LOWER(k) ((k) >= 'A' && (k) <= 'Z' ? (k) + 32 : (k))
-
 extern volatile sig_atomic_t active_child;
 extern void shutdown_handler(int sig);
 
-static void run_tool(const char *path, bool *ok, const char *fail_msg, WINDOW **win, int *r, int *c, struct cfg *cfg, const char *cfgpath, int h, int ku, int kd, int ks, int kq) {
-    if (!*ok) *ok = is_executable_file(path);
+static void config_keys(struct cfg *c) {
+    c->key_up = tolower(c->key_up);
+    c->key_down = tolower(c->key_down);
+    c->key_select = tolower(c->key_select);
+    c->key_quit = tolower(c->key_quit);
+}
 
-    if (!*ok) {
-        show_message(*win, "Not found", fail_msg);
+static void setup_win(WINDOW **w) {
+    int r, c;
+    if (*w) delwin(*w);
+    getmaxyx(stdscr, r, c);
+    if (!(*w = recreate_window(&r, &c))) {
+        *w = newwin(r - 2, c - 2, 1, 1);
+        keypad(*w, TRUE);
+        wtimeout(*w, -1);
+    }
+}
+
+static void run(const char *bin, bool *ok, const char *msg, WINDOW **w, struct cfg *c, const char *cp) {
+    if (!*ok && !(*ok = is_executable_file(bin))) {
+        show_message(*w, "Not found", msg);
         return;
     }
 
     flushinp();
     def_prog_mode();
     endwin();
-    int rc = spawn_and_wait(path);
-    struct timespec ts = {0, 100000000L};
-    nanosleep(&ts, NULL);
+    
+    int rc = spawn_and_wait(bin);
+    nanosleep(&(struct timespec){0, 100000000L}, NULL);
+    
     reset_prog_mode();
     refresh();
-
-    load_config(cfg, cfgpath);
-    cfg->key_up = KEY_LOWER(cfg->key_up);
-    cfg->key_down = KEY_LOWER(cfg->key_down);
-    cfg->key_select = KEY_LOWER(cfg->key_select);
-    cfg->key_quit = KEY_LOWER(cfg->key_quit);
-
-    if (*win) delwin(*win);
-    *win = recreate_window(r, c);
-    if (!*win) {
-        *win = newwin(*r - 2, *c - 2, 1, 1);
-        keypad(*win, TRUE);
-        wtimeout(*win, -1);
-    }
-    draw_menu(*win, h, ku, kd, ks, kq);
+    
+    load_config(c, cp);
+    config_keys(c);
+    setup_win(w);
 
     if (rc == 0) {
-        *ok = is_executable_file(path);
+        *ok = true;
     } else {
-        char buf[128];
-        const char *title = (rc >= 128) ? "Crashed" : ((rc == -1 || rc == 127) ? "Error" : "Exited");
-        if (rc == -1) snprintf(buf, sizeof buf, "Failed to run (fork/exec error).");
-        else if (rc == 127) snprintf(buf, sizeof buf, "Failed to exec (exit 127).");
-        else if (rc >= 128) snprintf(buf, sizeof buf, "Terminated by signal %d", rc - 128);
-        else snprintf(buf, sizeof buf, "Exited with status %d", rc);
-        show_message(*win, title, buf);
+        char buf[64];
+        if (rc == -1) snprintf(buf, sizeof buf, "Fork failed");
+        else if (rc == 127) snprintf(buf, sizeof buf, "Exec failed (127)");
+        else if (rc >= 128) snprintf(buf, sizeof buf, "Signal %d", rc - 128);
+        else snprintf(buf, sizeof buf, "Exit %d", rc);
+        show_message(*w, rc >= 128 ? "Crashed" : "Error", buf);
     }
 }
 
 int main(int argc, char **argv) {
-    struct cfg config;
-    char cfgpath[PATH_MAX];
-    char g_path[PATH_MAX] = {0};
-    char s_path[PATH_MAX] = {0};
-    char *arg0 = (argc > 0) ? argv[0] : NULL;
-
-    if (!config_path_for_exe(cfgpath, sizeof(cfgpath), arg0) || !load_config(&config, cfgpath)) {
-        config.key_up = 'w';
-        config.key_down = 's';
-        config.key_select = 10;
-        config.key_quit = 'q';
+    struct cfg c;
+    char cp[PATH_MAX], gp[PATH_MAX], sp[PATH_MAX], *a0 = argc > 0 ? argv[0] : NULL;
+    
+    if (!config_path_for_exe(cp, sizeof cp, a0) || !load_config(&c, cp)) {
+        c.key_up = 'w'; c.key_down = 's'; c.key_select = 10; c.key_quit = 'q';
     }
+    config_keys(&c);
 
-    config.key_up = KEY_LOWER(config.key_up);
-    config.key_down = KEY_LOWER(config.key_down);
-    config.key_select = KEY_LOWER(config.key_select);
-    config.key_quit = KEY_LOWER(config.key_quit);
-
-    bool g_ok = build_gammatui_path(g_path, sizeof g_path, arg0) && is_executable_file(g_path);
-    bool s_ok = build_settings_path(s_path, sizeof s_path, arg0) && is_executable_file(s_path);
+    bool go = build_gammatui_path(gp, sizeof gp, a0) && is_executable_file(gp);
+    bool so = build_settings_path(sp, sizeof sp, a0) && is_executable_file(sp);
 
     initscr();
     cbreak();
@@ -89,62 +83,39 @@ int main(int argc, char **argv) {
     keypad(stdscr, TRUE);
     curs_set(0);
 
-    struct sigaction sh = {0};
-    sh.sa_handler = shutdown_handler;
-    sigemptyset(&sh.sa_mask);
-    sh.sa_flags = SA_RESTART;
-    sigaction(SIGINT, &sh, NULL);
-    sigaction(SIGTERM, &sh, NULL);
+    struct sigaction sa = { .sa_handler = shutdown_handler, .sa_flags = SA_RESTART };
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
 
-    int rows, cols, highlight = 0;
-    getmaxyx(stdscr, rows, cols);
-    WINDOW *win = recreate_window(&rows, &cols);
-    if (!win) {
-        win = newwin(rows - 2, cols - 2, 1, 1);
-        keypad(win, TRUE);
-        wtimeout(win, -1);
-    }
+    WINDOW *win = NULL;
+    setup_win(&win);
+    int hl = 0;
 
-    draw_menu(win, highlight, config.key_up, config.key_down, config.key_select, config.key_quit);
-
-    bool running = true;
-    while (running) {
+    while (true) {
+        draw_menu(win, hl, c.key_up, c.key_down, c.key_select, c.key_quit);
         int ch = wgetch(win);
-        if (ch == ERR) continue;
-
+        
         if (ch == KEY_RESIZE) {
             endwin();
             refresh();
-            getmaxyx(stdscr, rows, cols);
-            if (win) delwin(win);
-            win = recreate_window(&rows, &cols);
-            if (!win) {
-                win = newwin(rows - 2, cols - 2, 1, 1);
-                keypad(win, TRUE);
-                wtimeout(win, -1);
-            }
-            draw_menu(win, highlight, config.key_up, config.key_down, config.key_select, config.key_quit);
+            setup_win(&win);
             continue;
         }
 
-        ch = KEY_LOWER(ch);
+        if (ch == ERR) continue;
+        ch = tolower(ch);
 
-        if (ch == config.key_up) {
-            highlight = (highlight + 2) % 3;
-        } else if (ch == config.key_down) {
-            highlight = (highlight + 1) % 3;
-        } else if (ch == config.key_quit) {
-            running = false;
-        } else if (ch == config.key_select) {
-            if (highlight == MI_Adjustment) {
-                run_tool(g_path, &g_ok, "Expected ../gammatui/gammatui.elf relative to menu.elf\nPlace gammatui.elf at ../gammatui/gammatui.elf and make it executable.", &win, &rows, &cols, &config, cfgpath, highlight, config.key_up, config.key_down, config.key_select, config.key_quit);
-            } else if (highlight == MI_Settings) {
-                run_tool(s_path, &s_ok, "Expected ../settings/brightnesstui.elf relative to menu.elf\nPlace brightnesstui.elf at ../settings/brightnesstui.elf and make it executable.", &win, &rows, &cols, &config, cfgpath, highlight, config.key_up, config.key_down, config.key_select, config.key_quit);
-            } else if (highlight == MI_Quit) {
-                running = false;
-            }
+        if (ch == c.key_quit) break;
+        else if (ch == c.key_up) hl = (hl + 2) % 3;
+        else if (ch == c.key_down) hl = (hl + 1) % 3;
+        else if (ch == c.key_select) {
+            if (hl == MI_Quit) break;
+            bool g = (hl == MI_Adjustment);
+            run(g ? gp : sp, g ? &go : &so, 
+                g ? "Missing ../gammatui/gammatui.elf" : "Missing ../settings/brightnesstui.elf", 
+                &win, &c, cp);
         }
-        if (running) draw_menu(win, highlight, config.key_up, config.key_down, config.key_select, config.key_quit);
     }
 
     if (active_child > 0) terminate_child_group(active_child);
