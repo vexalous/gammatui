@@ -1,61 +1,43 @@
 #define _XOPEN_SOURCE 700
 #include "utils.h"
-#include <libgen.h>
 #include <limits.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+static char c[PATH_MAX];
+
+static char *g(const char *a) {
+    if (*c) return c;
+    ssize_t n = readlink("/proc/self/exe", c, sizeof(c) - 1);
+    if (n > 0) c[n] = 0;
+    else if (!a || !realpath(a, c)) return 0;
+    
+    char *s = strrchr(c, '/');
+    if (s) *s = 0; else { c[0] = '.'; c[1] = 0; }
+    return c;
+}
+
 bool is_executable_file(const char *p) {
     struct stat s;
-    return p && stat(p, &s) == 0 && S_ISREG(s.st_mode) && access(p, X_OK) == 0;
+    return p && !access(p, X_OK) && !stat(p, &s) && S_ISREG(s.st_mode);
 }
 
-bool resolve_exe_dir(char *out, size_t outlen, const char *argv0) {
-    char buf[PATH_MAX];
-    char *path = NULL;
-
-#if defined(__linux__)
-    ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-    if (n > 0) {
-        buf[n] = '\0';
-        path = buf;
-    }
-#endif
-
-    if (!path && argv0 && *argv0) {
-        if (realpath(argv0, buf)) {
-            path = buf;
-        }
-    }
-
-    if (!path) return false;
-
-    char *d = dirname(path);
-    if (!d) return false;
-
-    return snprintf(out, outlen, "%s", d) < (int)outlen;
+static bool b(char *o, size_t l, const char *a, const char *s) {
+    char *d = g(a);
+    return d && snprintf(o, l, s ? "%s/%s" : "%s", d, s) < (int)l;
 }
 
-static bool build_sibling_path(char *out, size_t outlen, const char *argv0, const char *rel_path) {
-    char dir[PATH_MAX];
-    if (!resolve_exe_dir(dir, sizeof(dir), argv0)) return false;
-
-    char tmp[PATH_MAX];
-    if (snprintf(tmp, sizeof(tmp), "%s/%s", dir, rel_path) >= (int)sizeof(tmp)) {
-        return false;
-    }
-
-    return snprintf(out, outlen, "%s", tmp) < (int)outlen;
+bool resolve_exe_dir(char *o, size_t l, const char *a) {
+    return b(o, l, a, 0);
 }
 
-bool build_gammatui_path(char *out, size_t outlen, const char *argv0) {
-    return build_sibling_path(out, outlen, argv0, "../gammatui/gammatui.elf");
+bool build_gammatui_path(char *o, size_t l, const char *a) {
+    return b(o, l, a, "../gammatui/gammatui.elf");
 }
 
-bool build_settings_path(char *out, size_t outlen, const char *argv0) {
-    return build_sibling_path(out, outlen, argv0, "../settings/brightnesstui.elf");
+bool build_settings_path(char *o, size_t l, const char *a) {
+    return b(o, l, a, "../settings/brightnesstui.elf");
 }
