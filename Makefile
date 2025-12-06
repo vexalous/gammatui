@@ -1,5 +1,17 @@
 CC = gcc
-CFLAGS = -std=c99 -pedantic-errors -Werror -Wall -Wextra -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wconversion -Wunreachable-code -Iinclude -Isrc/settings -g
+CFLAGS = -std=c99 -g -pedantic-errors -Werror -Wall -Wextra -Wpedantic \
+	-Wformat=2 -Wformat-overflow=2 -Wformat-truncation=2 -Wformat-security -Wnull-dereference \
+	-Wstack-protector -Wtrampolines -Walloca -Wvla -Warray-bounds=2 \
+	-Wimplicit-fallthrough=3 -Wshift-overflow=2 -Wcast-qual -Wstringop-overflow=4 \
+	-Wconversion -Wsign-conversion -Wlogical-op -Wduplicated-cond -Wduplicated-branches \
+	-Wrestrict -Wshadow -Wundef -Wredundant-decls -Wfloat-equal -Wbad-function-cast \
+	-Wcast-align -Wwrite-strings -Wstrict-prototypes -Wold-style-definition \
+	-Wmissing-prototypes -Wmissing-declarations -Wmissing-noreturn -Wmissing-format-attribute \
+	-Wpacked -Wpadded -Waggregate-return -Wswitch-default -Wswitch-enum -Wunreachable-code \
+	-Winline -Winvalid-pch -Wdisabled-optimization -Wdouble-promotion -Wunsafe-loop-optimizations \
+	-Wvector-operation-performance -Wunused -Wunused-macros -Wunused-const-variable \
+	-Wunused-parameter -Wc++-compat -Iinclude -Isrc/settings
+
 LDFLAGS = -pthread
 LDLIBS_GAMMATUI = -lncurses -ltinfo -lX11 -lXrandr -lm -lwayland-client
 LDLIBS_MENU = -lncurses -ltinfo
@@ -34,29 +46,23 @@ all: $(TARGET_MENU) $(TARGET_GAMMATUI) $(TARGET_SETTINGS)
 $(TARGET_GAMMATUI): $(GAMMATUI_OBJS)
 	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_GAMMATUI)
-	@echo "Linked ==> $@"
 
 $(TARGET_MENU): $(MENU_OBJS)
 	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_MENU)
-	@echo "Linked ==> $@"
 
 $(TARGET_SETTINGS): $(SETTINGS_OBJS)
 	@mkdir -p $(@D)
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS_SETTINGS)
-	@echo "Linked ==> $@"
 
 $(BUILD_DIR)/%.o: src/%.c
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
-	@echo "Compiled $<"
 
 run: all
-	@echo "Starting application..."
 	@$(TARGET_MENU)
 
 install: all
-	@echo "Installing libraries to $(DESTDIR)$(INSTALL_DIR)..."
 	@mkdir -p $(DESTDIR)$(INSTALL_DIR)/menu
 	@mkdir -p $(DESTDIR)$(INSTALL_DIR)/gammatui
 	@mkdir -p $(DESTDIR)$(INSTALL_DIR)/settings
@@ -64,33 +70,24 @@ install: all
 	install -m 755 $(TARGET_GAMMATUI) $(DESTDIR)$(INSTALL_DIR)/gammatui/gammatui.elf
 	install -m 755 $(TARGET_SETTINGS) $(DESTDIR)$(INSTALL_DIR)/settings/brightnesstui.elf
 	install -m 644 src/settings/config.json $(DESTDIR)$(INSTALL_DIR)/settings/config.json
-	
-	@echo "Installing binary symlink to $(DESTDIR)$(BINDIR)..."
 	@mkdir -p $(DESTDIR)$(BINDIR)
 	@ln -sf $(INSTALL_DIR)/menu/menu.elf $(DESTDIR)$(BINDIR)/gammatui
-	
-	@echo "Installing desktop entry to $(DESTDIR)$(APPSDIR)..."
 	@mkdir -p $(DESTDIR)$(APPSDIR)
 	@echo "[Desktop Entry]" > $(DESTDIR)$(APPSDIR)/gammatui.desktop
 	@echo "Type=Application" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
 	@echo "Name=gammatui" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
-	@echo "Comment=A tui to adjust effects such as gamma and brightness for an output. Written in c." >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
+	@echo "Comment=A lightweight, highly customizable text user interface to adjust gamma, brightness, and related effects for an output." >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
 	@echo "Exec=$(BINDIR)/gammatui" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
 	@echo "Terminal=true" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
 	@echo "Categories=Utility;Settings;" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
 	@echo "Icon=utilities-terminal" >> $(DESTDIR)$(APPSDIR)/gammatui.desktop
 
-	@echo "Installation complete."
-
 uninstall:
-	@echo "Uninstalling from $(DESTDIR)$(INSTALL_DIR)..."
 	@rm -f $(DESTDIR)$(BINDIR)/gammatui
 	@rm -rf $(DESTDIR)$(INSTALL_DIR)
 	@rm -f $(DESTDIR)$(APPSDIR)/gammatui.desktop
-	@echo "Uninstallation complete."
 
 clean:
-	@echo "Cleaning up build files..."
 	@rm -rf $(BUILD_DIR)
 
 .PHONY: all clean run install uninstall
