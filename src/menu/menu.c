@@ -12,8 +12,6 @@
 #include <unistd.h>
 #include <limits.h>
 
-extern volatile sig_atomic_t active_child;
-extern void shutdown_handler(int sig);
 
 static void config_keys(struct cfg *c) {
     c->key_up = tolower(c->key_up);
@@ -42,13 +40,13 @@ static void run(const char *bin, bool *ok, const char *msg, WINDOW **w, struct c
     flushinp();
     def_prog_mode();
     endwin();
-    
+
     int rc = spawn_and_wait(bin);
     nanosleep(&(struct timespec){0, 100000000L}, NULL);
-    
+
     reset_prog_mode();
     refresh();
-    
+
     load_config(c, cp);
     config_keys(c);
     setup_win(w);
@@ -68,7 +66,7 @@ static void run(const char *bin, bool *ok, const char *msg, WINDOW **w, struct c
 int main(int argc, char **argv) {
     struct cfg c;
     char cp[PATH_MAX], gp[PATH_MAX], sp[PATH_MAX], *a0 = argc > 0 ? argv[0] : NULL;
-    
+
     if (!config_path_for_exe(cp, sizeof cp, a0) || !load_config(&c, cp)) {
         c.key_up = 'w'; c.key_down = 's'; c.key_select = 10; c.key_quit = 'q';
     }
@@ -95,7 +93,7 @@ int main(int argc, char **argv) {
     while (true) {
         draw_menu(win, hl, c.key_up, c.key_down, c.key_select, c.key_quit);
         int ch = wgetch(win);
-        
+
         if (ch == KEY_RESIZE) {
             endwin();
             refresh();
@@ -112,8 +110,8 @@ int main(int argc, char **argv) {
         else if (ch == c.key_select) {
             if (hl == MI_Quit) break;
             bool g = (hl == MI_Adjustment);
-            run(g ? gp : sp, g ? &go : &so, 
-                g ? "Missing ../gammatui/gammatui.elf" : "Missing ../settings/brightnesstui.elf", 
+            run(g ? gp : sp, g ? &go : &so,
+                g ? "Missing ../gammatui/gammatui.elf" : "Missing ../settings/brightnesstui.elf",
                 &win, &c, cp);
         }
     }
