@@ -30,7 +30,7 @@ void terminate_child_group(pid_t p) {
     while (waitpid(-1, 0, WNOHANG) > 0);
 }
 
-void shutdown_handler(int s) {
+__attribute__((noreturn)) void shutdown_handler(int s) {
     if (active_child > 0) terminate_child_group(active_child);
     endwin();
     _exit(128 + (s & 0x7f));
