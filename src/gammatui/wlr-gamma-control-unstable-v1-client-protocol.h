@@ -76,7 +76,7 @@ zwlr_gamma_control_v1_add_listener(struct zwlr_gamma_control_v1 *zwlr_gamma_cont
 				   const struct zwlr_gamma_control_v1_listener *listener, void *data)
 {
 	return wl_proxy_add_listener((struct wl_proxy *) zwlr_gamma_control_v1,
-				     (void (**)(void)) listener, data);
+				     (void (**)(void))(void *)(uintptr_t)listener, data);
 }
 
 #define ZWLR_GAMMA_CONTROL_V1_SET_GAMMA 0
