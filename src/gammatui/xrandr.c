@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 200809L
 #include "gammatui.h"
 #include <pthread.h>
 #include <stdio.h>
@@ -34,7 +33,7 @@ static struct {
     struct zwlr_gamma_control_v1 *control;
     uint32_t gamma_size;
     int initialized;
-    int failed;
+    int failed; int _pad;
 } wl_state = {0};
 
 static void fill_gamma_table(uint16_t *table, uint32_t size, float gamma, float bright);
@@ -57,10 +56,10 @@ static const struct zwlr_gamma_control_v1_listener gamma_listener = {
 static void registry_handle_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
     (void)data; (void)version;
     if (strcmp(interface, "zwlr_gamma_control_manager_v1") == 0) {
-        wl_state.manager = wl_registry_bind(registry, name, &zwlr_gamma_control_manager_v1_interface, 1);
+        wl_state.manager = (struct zwlr_gamma_control_manager_v1 *)wl_registry_bind(registry, name, &zwlr_gamma_control_manager_v1_interface, 1);
     } else if (strcmp(interface, "wl_output") == 0) {
         if (!wl_state.output) {
-            wl_state.output = wl_registry_bind(registry, name, &wl_output_interface, 1);
+            wl_state.output = (struct wl_output *)wl_registry_bind(registry, name, &wl_output_interface, 1);
         }
     }
 }
@@ -81,7 +80,7 @@ static int is_wayland_session(void) {
 
 static void lazy_init_wayland(void) {
     if (wl_state.initialized) return;
-    
+
     wl_state.display = wl_display_connect(NULL);
     if (!wl_state.display) {
         wl_state.failed = 1;
@@ -102,7 +101,7 @@ static void lazy_init_wayland(void) {
     }
 
     if (wl_state.gamma_size == 0) wl_state.failed = 1;
-    
+
     wl_state.initialized = 1;
 }
 
@@ -113,17 +112,17 @@ static void wayland_apply(float g, float b) {
     char tmpname[] = "/tmp/gammatui-XXXXXX";
     int fd = mkstemp(tmpname);
     if (fd < 0) return;
-    
+
     unlink(tmpname);
-    
+
     size_t file_size = wl_state.gamma_size * 3 * sizeof(uint16_t);
-    
+
     if (ftruncate(fd, (off_t)file_size) < 0) {
         close(fd);
         return;
     }
 
-    uint16_t *data = mmap(NULL, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    uint16_t *data = (uint16_t *)mmap(NULL, file_size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
     if (data == MAP_FAILED) {
         close(fd);
         return;
@@ -180,7 +179,7 @@ int detect_output(char *outbuf, size_t outlen) {
         }
         if (info) XRRFreeOutputInfo(info);
     }
-    
+
     if (!found && candidate[0]) {
         strncpy(outbuf, candidate, outlen - 1);
         found = 1;
@@ -197,9 +196,9 @@ static void fill_gamma_table(uint16_t *table, uint32_t size, float gamma, float 
         v = pow(v, 1.0 / (double)gamma) * (double)bright;
         if (v > 1.0) v = 1.0;
         if (v < 0.0) v = 0.0;
-        
+
         uint16_t val = (uint16_t)(v * 65535.0 + 0.5);
-        
+
         table[i] = val;
         table[i + size] = val;
         table[i + 2 * size] = val;
@@ -213,7 +212,7 @@ struct xr_args {
 };
 
 static void *xr_worker_x11(void *arg) {
-    struct xr_args *a = arg;
+    struct xr_args *a = (struct xr_args *)arg;
     float g_val = 1.0f, b_val = 1.0f;
     sscanf(a->val, "%f:%f", &g_val, &b_val);
 
@@ -228,7 +227,7 @@ static void *xr_worker_x11(void *arg) {
                     for(int i=0; i<size; i++) {
                         double ramp = (double)i / (double)(size - 1);
                         double v = pow(ramp, 1.0/(double)g_val) * (double)b_val;
-                        if(v>1.0) v=1.0; 
+                        if(v>1.0) v=1.0;
                         if(v<0.0) v=0.0;
                         unsigned short s = (unsigned short)(v * 65535.0 + 0.5);
                         gamma->red[i] = gamma->green[i] = gamma->blue[i] = s;
@@ -240,7 +239,7 @@ static void *xr_worker_x11(void *arg) {
         }
         XCloseDisplay(dpy);
     }
-    
+
     free(a);
     return NULL;
 }
@@ -253,7 +252,7 @@ void xr_call_async(const char *output, const char *opt, const char *val) {
         return;
     }
 
-    struct xr_args *a = malloc(sizeof(*a));
+    struct xr_args *a = (struct xr_args *)malloc(sizeof(*a));
     if (!a) return;
     strncpy(a->opt, opt, sizeof(a->opt) - 1);
     a->opt[sizeof(a->opt) - 1] = '\0';
