@@ -15,7 +15,7 @@ void init_colors_safe(int sr, int sg, int sb, int ur, int ug, int ub);
 void draw_bar(WINDOW *w, int y, int x, int width, double value, double lo, double hi);
 void draw_rounded_border(WINDOW *w);
 
-void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, int cols, 
+void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, int cols,
              int k_up, int k_down, int k_sel, int k_quit);
 
 void apply_values(double gamma, double bright);
