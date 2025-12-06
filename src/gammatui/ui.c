@@ -35,7 +35,7 @@ void init_colors_safe(int sr, int sg, int sb, int ur, int ug, int ub) {
     if (!has_colors()) return;
     start_color();
     use_default_colors();
-    
+
     int sr_n = sr * 1000 / 255;
     int sg_n = sg * 1000 / 255;
     int sb_n = sb * 1000 / 255;
@@ -98,7 +98,7 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
     wattron(win, COLOR_PAIR(selected == 0 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_LABEL) | A_BOLD);
     mvwprintw(win, gamma_y, left_margin, "Gamma");
     wattroff(win, COLOR_PAIR(selected == 0 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_LABEL) | A_BOLD);
-    char gamma_val_str[10];
+    char gamma_val_str[320];
     snprintf(gamma_val_str, sizeof(gamma_val_str), "%.2f", gamma);
     wattron(win, COLOR_PAIR(selected == 0 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_VALUE) | A_BOLD);
     mvwprintw(win, gamma_y, cols - left_margin - (int)strlen(gamma_val_str), "%s", gamma_val_str);
@@ -108,7 +108,7 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
     wattron(win, COLOR_PAIR(selected == 1 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_LABEL) | A_BOLD);
     mvwprintw(win, bright_y, left_margin, "Brightness");
     wattroff(win, COLOR_PAIR(selected == 1 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_LABEL) | A_BOLD);
-    char bright_val_str[10];
+    char bright_val_str[320];
     snprintf(bright_val_str, sizeof(bright_val_str), "%.2f", bright);
     wattron(win, COLOR_PAIR(selected == 1 ? COLOR_PAIR_VALUE_SELECTED : COLOR_PAIR_VALUE) | A_BOLD);
     mvwprintw(win, bright_y, cols - left_margin - (int)strlen(bright_val_str), "%s", bright_val_str);
@@ -124,8 +124,8 @@ void draw_ui(WINDOW *win, double gamma, double bright, int selected, int rows, i
     const char *kn_qt = keyname(k_quit); if(!kn_qt) kn_qt="?";
 
     char help_text[256];
-    snprintf(help_text, sizeof(help_text), 
-             "[%s/%s] Select [%s] Set Value [R] Reset [%s] Quit", 
+    snprintf(help_text, sizeof(help_text),
+             "[%s/%s] Select [%s] Set Value [R] Reset [%s] Quit",
              kn_up, kn_dn, kn_sl, kn_qt);
 
     int help_x = (cols - (int)strlen(help_text)) / 2;
