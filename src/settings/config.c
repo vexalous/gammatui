@@ -22,7 +22,7 @@ void config_set_defaults(struct cfg *c) {
 bool config_path_for_exe(char *out, size_t outlen, const char *argv0) {
     char buf[PATH_MAX];
     ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-    
+
     if (n > 0) {
         buf[n] = '\0';
     } else if (!argv0 || !realpath(argv0, buf)) {
@@ -41,7 +41,7 @@ bool config_path_for_exe(char *out, size_t outlen, const char *argv0) {
 bool load_config(struct cfg *c, const char *path) {
     FILE *f;
     if (!c || !path || !(f = fopen(path, "r"))) return false;
-    
+
     config_set_defaults(c);
 
     char line[256];
