@@ -9,7 +9,7 @@
 int main(int c, char **v) {
     struct cfg g;
     char p[4096], b[32];
-    struct { char *l; int t; void *v; } f[] = {
+    struct { const char *l; long t; void *v; } f[] = {
         {"Output", 0, g.output},
         {"Gamma Min", 1, &g.gamma_min}, {"Gamma Max", 1, &g.gamma_max},
         {"Bright Min", 1, &g.bright_min}, {"Bright Max", 1, &g.bright_max},
@@ -37,13 +37,13 @@ int main(int c, char **v) {
             if (i == h) wattron(w, A_REVERSE);
             mvwprintw(w, 3 + i, 2, "%-12s", f[i].l);
             wmove(w, 3 + i, 15);
-            if (f[i].t == 0) waddstr(w, f[i].v);
+            if (f[i].t == 0) waddstr(w, (const char *)f[i].v);
             else if (f[i].t == 1) wprintw(w, "%.2f", *(double*)f[i].v);
             else if (f[i].t == 2) wprintw(w, "%d", *(int*)f[i].v);
             else if (f[i].t == 3) waddstr(w, keyname(*(int*)f[i].v));
             if (i == h) wattroff(w, A_REVERSE);
         }
-        
+
         if ((k = wgetch(w)) == ERR) continue;
         int nk = K(k);
 
@@ -51,9 +51,9 @@ int main(int c, char **v) {
         else if (nk == K(g.key_down)) h = (h + 1) % cnt;
         else if (nk == K(g.key_quit)) run = 0;
         else if (nk == K(g.key_select) || k == 10) {
-            int t = f[h].t;
+            long t = f[h].t;
             mvwprintw(w, 3 + h, 15, "              ");
-            
+
             if (t == 4) {
                 mvwaddstr(w, 3 + h, 15, save_config(&g, p) ? "Saved" : "Error");
                 wrefresh(w); napms(500);
@@ -70,7 +70,7 @@ int main(int c, char **v) {
                 mvwgetnstr(w, 3 + h, 15, b, 31);
                 noecho(); curs_set(0);
                 if (*b) {
-                    if (t == 0) strncpy(f[h].v, b, 127);
+                    if (t == 0) strncpy((char *)f[h].v, b, 127);
                     else if (t == 1) *(double*)f[h].v = strtod(b, 0);
                     else *(int*)f[h].v = atoi(b);
                 }
