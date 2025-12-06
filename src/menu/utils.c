@@ -14,7 +14,7 @@ static char *g(const char *a) {
     ssize_t n = readlink("/proc/self/exe", c, sizeof(c) - 1);
     if (n > 0) c[n] = 0;
     else if (!a || !realpath(a, c)) return 0;
-    
+
     char *s = strrchr(c, '/');
     if (s) *s = 0; else { c[0] = '.'; c[1] = 0; }
     return c;
